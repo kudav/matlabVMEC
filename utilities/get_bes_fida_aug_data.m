@@ -56,7 +56,8 @@ dispersion_in=h5read(filename,'/dispersion');
 
 lambda = h5read(filename,'/cor_wavel');%-dispersion_in;%-0.104;%-0.055;
 lambda2=h5read('/raven/u/davku/pub/38581_CFR_wavel_3Nov2023.h5','/data');
-lambda2=lambda2.WAVEL;%fliplr(lambda2.WAVEL);
+%lambda=lambda2.WAVEL;%fliplr(lambda2.WAVEL);
+lambda2=lambda2.WAVEL;
 time = h5read(filename,'/time_arr');
 instfu_gamma = h5read(filename,'/instfu_gamma')';
 instfu_box_nm = h5read(filename,'/instfu_box_nm')';
