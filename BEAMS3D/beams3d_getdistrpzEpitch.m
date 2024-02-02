@@ -60,12 +60,21 @@ Wval = sqrt(V.^2-Vval.^2); %Vperp
 S   = permute(data.S_ARR,[2 1 3]);
 U   = permute(data.U_ARR,[2 1 3]);
 pgrid = mod(phi,data.phiaxis(end));
-sval= interp3(data.raxis,data.phiaxis,data.zaxis,...
-    S,r,pgrid,z);
+rhoval= interp3(data.raxis,data.phiaxis,data.zaxis,...
+    sqrt(S),r,pgrid,z);
 uval= interp3(data.raxis,data.phiaxis,data.zaxis,...
     U,r,pgrid,z);
 pval = mod(phi,2*pi);
-rhoval = sqrt(sval);
+%rhoval = sqrt(sval);
+
+if isfield(data,'VTOR_ARR')
+    disp('Using VTOR_ARR to transform from plasma to lab frame!')
+    VT   = permute(data.VTOR_ARR,[2 1 3]);
+ vtor= interp3(data.raxis,data.phiaxis,data.zaxis,...
+    VT,r,pgrid,z);   
+ Vval=Vval+vtor;
+end
+
 
 % Jacobian from D. Moseev paper
 % https://doi.org/10.1063/1.5085429

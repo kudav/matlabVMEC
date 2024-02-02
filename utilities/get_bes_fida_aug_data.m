@@ -55,7 +55,8 @@ names_unsorted = h5read(filename,'/los_name');
 dispersion_in=h5read(filename,'/dispersion');
 
 lambda = h5read(filename,'/cor_wavel');%-dispersion_in;%-0.104;%-0.055;
-lambda2=h5read('/raven/u/davku/pub/38581_CFR_wavel_3Nov2023.h5','/data');
+%lambda2=h5read('/raven/u/davku/pub/38581_CFR_wvl1_30Jan2024_wrong.h5','/data');
+lambda2=h5read('/raven/u/davku/pub/38581_CFR_wvl4_30Jan2024.h5','/data');
 %lambda=lambda2.WAVEL;%fliplr(lambda2.WAVEL);
 lambda2=lambda2.WAVEL;
 time = h5read(filename,'/time_arr');
@@ -63,8 +64,6 @@ instfu_gamma = h5read(filename,'/instfu_gamma')';
 instfu_box_nm = h5read(filename,'/instfu_box_nm')';
 instfu_gauss_nm = h5read(filename,'/instfu_gauss_nm')';
 cwav_mid = interp1(1:size(lambda,1),lambda,size(lambda,1)/2.);
-instfu = box_gauss_funct(lambda,0.,1.,cwav_mid,instfu_gamma,instfu_gauss_nm);
-
 
 % [R,I] = sort(R);
 % spec_in = spec_in(:,I,:);
@@ -107,7 +106,7 @@ if nargin > 2
                     %channel =find(~(I-varargin{i}));% I(varargin{i}); %Inverse lookup,
                     channel = varargin{i};
                 end
-                channel=channel+1;
+                %channel=channel+1;
             case 't_point'
                 i=i+1;
                 t_point = varargin{i};
@@ -308,8 +307,7 @@ for i = 1:size(plot_type,2)
         ax{i} = gca;
         hold on;
     else
-        %allAxesInFigure = findall(figs{i},'type','axes');
-        %ax = allAxesInFigure(~ismember(get(allAxesInFigure,'Tag'),{'legend','Colobar'}));
+        hold(ax{i},'on');
     end
     %legend(ax{i},'Location','best');
     switch lower(plot_type{i})
@@ -364,7 +362,11 @@ for i = 1:size(plot_type,2)
             fprintf(fid,[format, '\n'],[time, tmp]');
             fclose(fid);
         case 'spectrum'
-            
+            disp(['Cwav_mid=', num2str(cwav_mid(channel))]);
+            cwav_mid2 = interp1(1:size(lambda2,1),lambda2,size(lambda2,1)/2.);
+            disp(['Cwav_mid=', num2str(cwav_mid2(channel))]);
+            instfu = box_gauss_funct(lambda,0.,1.,cwav_mid,instfu_gamma,instfu_gauss_nm);
+
             time_dex_spec = permute(repmat(time_dex,1,1,size(spec,1)),[3,1,2]);
             tmp =squeeze(sum(spec.*time_dex_spec,3)./sum(time_dex_spec,3));
             plot(ax{i},lambda(:,channel),tmp(:,channel).*calibration, 'DisplayName',['Data ',  num2str(t_point - avg_time/2),' - ',num2str(t_point + avg_time/2), 's, Calib=', num2str(calibration)], 'LineWidth',2.0);%, Chan: ', names{channel}
@@ -450,7 +452,8 @@ sim_data.fida_range = fida_range;
 if ~(strcmp(dex_in,''))
     sim_data.dex = dex_in;
 end
-sim_data.instfu=instfu;
+sim_data.cwav_mid=cwav_mid;
+%sim_data.instfu=instfu;
 sim_data.instfu_gamma=instfu_gamma;
 sim_data.instfu_box_nm=instfu_box_nm;
 

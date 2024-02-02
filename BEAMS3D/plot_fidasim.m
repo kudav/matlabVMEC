@@ -741,9 +741,16 @@ for i = 1:size(plot_type,2)
                 if fac~=1.0
                     name = [name,', scale=',num2str(fac)];
                 end
-                cwav_mid=mean(spec.lambda);
+                
+                %cwav_mid=sim_data.cwav_mid(channel);
+                cwav_mid=mean(spec.lambda);%+(spec.lambda(2)-spec.lambda(1));
+                
+                disp(['Cwav_mid_fidasim=', num2str(cwav_mid)]);
+                %cwav_mid=sim_data.cwav_mid(channel);
+                %cwav_mid = interp1(1:size(spec.lambda,1),spec.lambda,size(spec.lambda,1)/2.)-(spec.lambda(2)-spec.lambda(1))/2.;
                 instfu = box_gauss_funct(spec.lambda,0.,1.,cwav_mid,sim_data.instfu_gamma,sim_data.instfu_box_nm);
                 plot(spec.lambda,conv(specr(:,channel),instfu(:,channel),'same'), 'DisplayName', ['Spectrum - ' name] );
+                %plot(spec.lambda,specr(:,channel), 'DisplayName', ['Spectrum no instfu - ' name] );
                 %plot(spec.lambda,specr(:,channel), 'DisplayName', ['Spectrum - ' name] );
                 % plot(spec.lambda, conv(spec.full(:,channel),instfu(:,channel),'same'), 'DisplayName',['Full - ' name] );
                 % plot(spec.lambda, conv(spec.half(:,channel),instfu(:,channel),'same'),  'DisplayName',['Half - ' name] );
@@ -757,7 +764,7 @@ for i = 1:size(plot_type,2)
                 %plot(spec.lambda, conv(spec.halo(:,channel),instfu(:,channel),'same'),  'DisplayName',['Halo only - ' name] ); %+spec.brems(:,channel)
                 %plot(spec.lambda, conv(spec.dcx(:,channel),instfu(:,channel),'same'),  'DisplayName',['DCX only - ' name] ); %+spec.brems(:,channel)
                 fprintf('Halo Centered at %.3f nm\n', sum(spec.lambda.*conv(spec.halo(:,channel)+spec.dcx(:,channel),instfu(:,channel),'same'))./sum(conv(spec.halo(:,channel)+spec.dcx(:,channel),instfu(:,channel),'same')));
-                plot(spec.lambda, conv(spec.fida(:,channel),instfu(:,channel),'same'),  'DisplayName',['FIDA - ' name] );
+                %plot(spec.lambda, conv(spec.fida(:,channel),instfu(:,channel),'same'),  'DisplayName',['FIDA - ' name] );
             else
                 plot(spec.lambda,specr(:,channel),linestyle, 'DisplayName', ['Spectrum - ' name] );
                 if (isfield(spec,'pfida' ) && lpassive)

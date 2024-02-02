@@ -57,7 +57,7 @@ if ~isempty(varargin)
                 i = i + 1;
                 raxis   = linspace(min(data.raxis), max(data.raxis), varargin{i});
                 i = i + 1;
-                paxis   = linspace(0, 2*pi, varargin{i});
+                paxis   = linspace(min(data.phiaxis), max(data.phiaxis), varargin{i});
                 i = i + 1;
                 zaxis   = linspace(min(data.zaxis), max(data.zaxis), varargin{i});
                 i = i + 1;
@@ -80,9 +80,13 @@ if ~isempty(varargin)
     end
 end
 
-Emax = ceil(0.5.*mass.*data.partvmax.^2./ec/1e4)*1e4;
-Eaxis   = 0.5*max(Emax)/nE:max(Emax)/nE:max(Emax);%linspace(0,Emax,nE);%%0:10E3:100E3;
-pitchaxis = -1+1/np:2/np:1;%linspace(-1,1,np);%-1:0.1:1;
+Emax = ceil(0.5.*mass.*data.partvmax.^2./ec);
+%Eaxis   = 0.5*max(Emax)/nE:max(Emax)/nE:max(Emax);%linspace(0,Emax,nE);%%0:10E3:100E3;
+%pitchaxis = -1+1/np:2/np:1;%linspace(-1,1,np);%-1:0.1:1;
+%Same axis as from BEAMS3D interface:
+Eaxis = ((1:nE) - 0.5) / nE * Emax;
+pitchaxis = ((1:np) - 0.5) / np * 2 - 1;
+
 [R,P,Z,E,PITCH] = ndgrid(raxis,paxis,zaxis,Eaxis,pitchaxis);
 dr=raxis(2)-raxis(1);
 dz=zaxis(2)-zaxis(1);
