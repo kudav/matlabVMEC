@@ -41,6 +41,9 @@ zaxis   = data.zaxis';%linspace(min(data.zaxis), max(data.zaxis), 71);
 paxis   = data.phiaxis';%linspace(0, 2*pi, 15);
 nE = data.ns_prof4;
 np = data.ns_prof5;
+dr=raxis(2)-raxis(1);
+dz=zaxis(2)-zaxis(1);
+dphi=paxis(2)-paxis(1);
 % Handle varargin
 if ~isempty(varargin)
     i=1;
@@ -49,17 +52,30 @@ if ~isempty(varargin)
             case{'axis'}
                 i = i + 1;
                 raxis = varargin{i};
+                if size(raxis,2)==1
+                    raxis = raxis';
+                end
                 i = i + 1;
                 paxis = varargin{i};
+                if size(paxis,2)==1
+                    paxis = paxis';
+                end
                 i = i + 1;
                 zaxis = varargin{i};
+                if size(zaxis,2)==1
+                    zaxis = zaxis';
+                end
             case{'n'}
                 i = i + 1;
-                raxis   = linspace(min(data.raxis), max(data.raxis), varargin{i});
+                dr=raxis(2)-raxis(1);
+                raxis   =  ((1:varargin{i})-1).*(raxis(end)-raxis(1)+dr)/varargin{i} + raxis(1)-dr/2;%!Lower grid edges%linspace(min(raxis), max(raxis), varargin{i});
                 i = i + 1;
-                paxis   = linspace(min(data.phiaxis), max(data.phiaxis), varargin{i});
+                dphi=paxis(2)-paxis(1);
+                paxis   = ((1:varargin{i})-1).*(paxis(end)-paxis(1)+dphi)/varargin{i}  + paxis(1)-dphi/2;%linspace(min(data.phiaxis), max(data.phiaxis), varargin{i});
                 i = i + 1;
-                zaxis   = linspace(min(data.zaxis), max(data.zaxis), varargin{i});
+                dz=zaxis(2)-zaxis(1);
+                zaxis   = ((1:varargin{i})-1).*(zaxis(end)-zaxis(1)+dz)/varargin{i} + zaxis(1)-dz/2;
+                %zaxis   = linspace(min(data.zaxis), max(data.zaxis), varargin{i});
                 i = i + 1;
                 nE = varargin{i};
                 i = i + 1;
@@ -80,6 +96,8 @@ if ~isempty(varargin)
     end
 end
 
+
+
 Emax = ceil(0.5.*mass.*data.partvmax.^2./ec);
 %Eaxis   = 0.5*max(Emax)/nE:max(Emax)/nE:max(Emax);%linspace(0,Emax,nE);%%0:10E3:100E3;
 %pitchaxis = -1+1/np:2/np:1;%linspace(-1,1,np);%-1:0.1:1;
@@ -88,9 +106,7 @@ Eaxis = ((1:nE) - 0.5) / nE * Emax;
 pitchaxis = ((1:np) - 0.5) / np * 2 - 1;
 
 [R,P,Z,E,PITCH] = ndgrid(raxis,paxis,zaxis,Eaxis,pitchaxis);
-dr=raxis(2)-raxis(1);
-dz=zaxis(2)-zaxis(1);
-dphi=paxis(2)-paxis(1);
+
 [R3,P3,Z3] = ndgrid(raxis,paxis,zaxis);
 [Rd,Pd,Zd] = ndgrid(data.raxis,data.phiaxis,data.zaxis);
 P3_mod=mod(P3,max(data.phiaxis));
@@ -161,7 +177,12 @@ F = griddedInterpolant(Rd,Pd,Zd, data.B_Z, 'spline');
 bz = F(R3, P3_mod, Z3);
 
 vr = zeros(size(br));
-vt = vr;
+if isfield(data,'VTOR_ARR')
+    F = griddedInterpolant(Rd,Pd,Zd, data.VTOR_ARR*100, 'spline');
+    vt = F(R3, P3_mod, Z3);
+else
+    vt = vr;
+end
 vz = vr;
 
 [er, et, ez] = gradient(data.POT_ARR,mean(diff(raxis)),mean(diff(paxis)),mean(diff(zaxis))); %first output corresponds to gradient along 2nd dimension???
