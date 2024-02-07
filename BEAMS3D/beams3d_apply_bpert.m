@@ -16,7 +16,8 @@ function [ lines_out ] = beams3d_apply_bpert(filename_in,fluxi0, ni,mi,varargin)
 %       'plot':        Plots the helical perturbation(s)
 %
 %   Usage:
-%   beams3d_apply_bpert('beams3d_38581_3350_b3d.h5','fieldlines_38581_3350_b3d.h5',0.3,1,2,'lines','save','plot');
+%   vmec=read_vmec('wout_test.nc');
+%   [pert] = beams3d_apply_bpert('beams3d_test.h5',1e-2,1,2,'plot','vmec',vmec);
 %
 %   Created by: D. Kulla (david.kulla@ipp.mpg.de)
 %   Version:    1.0
@@ -27,6 +28,9 @@ lsave = 0;
 llines=0;
 lvmec=0;
 lfieldlines=0;
+calculation='strum'; %'hirv';
+form='vacstrum';%'res','vacfcn'
+phase=0;
 % Handle varargin
 if nargin > 4
     i = 1;
@@ -46,8 +50,15 @@ if nargin > 4
                 llines=1;
             case 'vmec'
                 lvmec = 1;
-                                i=i+1;
+                i=i+1;
                 vmec = varargin{i};
+            case {'strum','hirv','ferrari'}
+                calculation=varargin{i};
+            case {'res','vacstrum','vacfcn'}
+                form=varargin{i};       
+            case {'phase'}
+                i=i+1;
+                phase = varargin{i};
         end
         i=i+1;
     end
@@ -67,7 +78,7 @@ rnorm=repmat(r,1,size(br,2),size(br,3));
 
 sarr = h5read(filename_in,'/S_ARR');
 uarr = h5read(filename_in,'/U_ARR');
-
+sarr(sarr>1.5)=0;
 u = zeros(size(sarr,1),size(sarr,3));
 %uarr2 = zeros(size(sarr,1),size(sarr,3));
 s=discretize(sarr,linspace(0,1,128));
@@ -92,68 +103,109 @@ yg = rg .* sin(phig);
 %bx = br .* cos(bphi);
 %by = br.* sin(bphi);
 
-fluxphi = zeros(size(rhoarr));
-i=1;
-%Quadratic/analytical form:
-%fluxir = fluxi0(i) * (rhoarr.^2) .*  (1- rhoarr).^2;
-%Strumberger 2008, Perturbation 2:
-fluxir= fluxi0(i).*(sarr).^(2/2) .* (1-(sarr)).^4;
-
-%c1=2;
-%c2=4;
-%c3=1;
-%f=@(x) x.^(c1/2).*(1-x).^c2;
-%fluxir= fluxi0(i)*f(sarr).^c3;
-if lplot
-    figure
-    x=linspace(0,1,100);
-plot(x,f(x));
-hold on
-%plot(x,fluxi0(i)*(sqrt(x)).^(2/2) .* (1-sqrt(x)).^4);
-%plot(linspace(0,1,100),.1*linspace(0,1,100).^(2/2) .* (1-linspace(0,1,100)).^2);
-%plot(rhoarr,fluxir);
-%plot(rhoarr,fluxir_s);
-xlabel('S=\rho^2')
-ylabel('Perturbation Amplitude');
+switch form
+    case 'res'
+        % Given parameters
+        alpha = 0.04;
+        beta = 0.87;
+        gamma = 0.01;
+        s_21 = 0.2693;
+        fluxir = islandWidthPerturbation(sarr, mi, ni, fluxi0, s_21, alpha, beta, gamma);
+    case 'vacstrum'
+        %Strumberger 2008, Perturbation 2: fluxi0=0.1
+        fluxir= fluxi0.*(sarr).^(2/2) .* (1-sarr).^4;
+        %Quadratic/analytical form in rho:
+        %fluxir = fluxi0(i) * (rhoarr.^2) .*  (1- rhoarr).^2;
+    case 'vacfcn'
+        c1=2;
+        c2=4;
+        c3=1;
+        f=@(x) x.^(c1/2).*(1-x).^c2;
+        fluxir= fluxi0*f(sarr).^c3;
 end
-fluxphi = fluxphi + fluxir .* cos(mi.*uarr + ni .* phig);
-%fluxphi = fluxphi + ones(size(rhoarr))*fluxi0(i);
-%end
-%fluxphi(rhoarr<0.2)=0;
-%fluxphi(rhoarr>0.5)=0;
-
-
-%fluxphi(sarr>1)=0;
-
-% brc = br.* fluxphi;
-% bphic = bphi.* fluxphi;
-% bzc = bz.* fluxphi;
-
-% %%
-% figure
-% colors = parula(20);
-% for i = 1:20
-% p = patch(isosurface(r0,phi0,z0,permute(fluxphi,[2,1,3]),i/10));
-% isonormals(r0,phi0,z0,permute(fluxphi,[2,1,3]),p)
-% p.FaceColor = colors(i,:);
-% p.EdgeColor = 'none';
-% hold on
+% 
+% if lplot
+%     figure
+%     x=linspace(0,1,100);
+%     plot(x,f(x));
+%     hold on
+%     %plot(x,fluxi0(i)*(sqrt(x)).^(2/2) .* (1-sqrt(x)).^4);
+%     %plot(linspace(0,1,100),.1*linspace(0,1,100).^(2/2) .* (1-linspace(0,1,100)).^2);
+%     %plot(rhoarr,fluxir);
+%     %plot(rhoarr,fluxir_s);
+%     xlabel('S=\rho^2')
+%     ylabel('Perturbation Amplitude');
 % end
-% view(3)
-% axis equal
-% camlight
-% lighting phong
-% xlabel('R')
-% ylabel('PHI')
-% zlabel('Z')
-%
-% %%
+
+
+
+
+%%
+dr = r(2)-r(1);
+dphi = phi(2)-phi(1);
+dz = z(2)-z(1);
+
+switch calculation
+    case 'hirv'
+        fluxphi = fluxir .* cos(mi.*uarr + ni .* phig-phase);
+        fluxphi(sarr>1.5)=0;
+        %Jacobsen formulation: B_pert = rot(alpha * B)
+        brc = br.* fluxphi;
+        bphic = bphi.* fluxphi;
+        bzc = bz.* fluxphi;
+        %Curl in cylindrical coordinates
+        % Calculate the gradients of the components of B
+        [~, dbrcdphi, dbrcdz] = gradient(brc, dr, dphi, dz);
+        [~, ~, dbphicdz] = gradient(bphic, dr, dphi, dz);
+        [dbzcdr, dbzcdphi, ~] = gradient(bzc, dr, dphi, dz);
+
+        % Calculate the product r*bphic
+        rbphic = rg .* bphic;
+
+        % Now take the gradient of rbphic with respect to r
+        [drbphicdr, ~, ~] = gradient(rbphic, dr, dphi, dz);
+
+        % Calculate each component of the curl
+        % Curl in cylindrical (r, phi, z) components
+        curl_br = (1./rg).*dbzcdphi - dbphicdz;
+        curl_bphi = dbrcdz - dbzcdr;
+        curl_bz = (1./rg).*(drbphicdr - dbrcdphi);
+
+        % Combine the components to form the curl vector
+        bpert = cat(4, curl_br, curl_bphi, curl_bz);
+    case 'strum'
+        fluxphi = fluxir .* cos(mi.*uarr - ni .* phig-phase);
+        fluxphi(sarr>1.5)=0;
+        %Strumberger formulation B_pert = gradPsitilde x gradPhi
+        %, dr, dphi, dz
+        %[gradB, ~, ~] = calculateFieldProperties(lines_out);
+        [dBdr, dBdphi, dBdz] = gradient(fluxphi, dr, dphi, dz);
+        gradphi=permute(repmat(gradient(phi,dphi),1,numel(r),numel(z),3),[2,1,3,4]);
+        gradB = cat(4, dBdr, dBdphi, dBdz); % 4th dimension represents the vector components
+        bpert=cross(gradB,gradphi);
+    case 'ferrari'
+        fluxphi = fluxir .* cos(mi.*uarr + ni .* phig-phase);
+        fluxphi(sarr>1.5)=0;        
+        brc = br;%.* fluxphi;
+        bphic = bphi.* fluxphi;
+        bzc = bz;%.* fluxphi;        
+        %[curl_br,curl_bphi,curl_bz,~] = curl(rg,phig,zg,brc,bphic,bzc);
+        [curl_br,curl_bphi,curl_bz,~] =  curl(brc,bphic,bzc);
+        bpert = cat(4, curl_br, curl_bphi, curl_bz);
+end
+curlr=squeeze(bpert(:,:,:,1));
+curlphi=squeeze(bpert(:,:,:,2));
+curlz=squeeze(bpert(:,:,:,3));
+curlr(isnan(curlr)|isinf(curlr)|sarr>1) = 0;
+curlphi(isnan(curlphi)|isinf(curlphi)|sarr>1) = 0;
+curlz(isnan(curlz)|isinf(curlz)|sarr>1) = 0;
+
 if lplot
     for j = numel(fluxi0)
         figure
         colors = parula(20);
         for i = 1:20
-            p = patch(isosurface(xg,yg,zg,fluxphi,i/20*max(fluxphi,[],'all')));
+            p = patch(isosurface(xg,yg,zg,fluxphi,i/20*max(fluxphi(sarr<1),[],'all')));
             %isonormals(xg,yg,zg,fluxphi,p)
             p.FaceColor = colors(i,:);
             p.EdgeColor = 'none';
@@ -167,77 +219,11 @@ if lplot
         ylabel('Y')
         zlabel('Z')
     end
-
     figure
     contour(r,z,squeeze(fluxphi(:,1,:))')
         xlabel('R')
-        ylabel('Z')  
-    % figure
-    % contour(r,z,squeeze(fluxphi(:,2,:))')
-    %     xlabel('R')
-    %     ylabel('Z')           
+        ylabel('Z')        
 end
-%%
-
-
-%Jacobsen formulation:
-% bx = brc .* cos(bphic);
-% by = brc .* sin(bphic);
-% [curlx,curly,curlz,~] = curl(xg,yg,zg,bx,by,bzc);
-% curlr = sqrt(curlx.^2+curly.^2);
-% curlphi= atan2(curly,curlx);
-% %[curlr,curlphi,curlz,~] = curl(rg,phig,zg,brc,bphic,bzc);
-% %[curlr,curlphi,curlz,~] = curl(brc,bphic,bzc);
-% curlr(isnan(curlr)|isinf(curlr)|sarr>1) = 0;
-% curlphi(isnan(curlphi)|isinf(curlphi)|sarr>1) = 0;
-% curlz(isnan(curlz)|isinf(curlz)|sarr>1) = 0;
-
-
-%Strumberger formulation B_pert = gradPsitilde x gradPhi
-dr = r(2)-r(1);
-dphi = phi(2)-phi(1);
-dz = z(2)-z(1);
-% lines_out.B_R = brc;
-% lines_out.B_Z = bzc;
-% lines_out.B_PHI = bphic;
-% lines_out.raxis = r;
-% lines_out.zaxis=z;
-% lines_out.phiaxis=phi;
-%[gradB, ~, ~] = calculateFieldProperties(lines_out);
-[dBdr, dBdphi, dBdz] = gradient(fluxphi, dr, dphi, dz); %, dr, dphi, dz
-gradphi=permute(repmat(gradient(phi,dphi),1,numel(r),numel(z),3),[2,1,3,4]);
-gradB = cat(4, dBdr, dBdphi, dBdz); % 4th dimension represents the vector components
-
-bpert=cross(gradB,gradphi);
-curlr=squeeze(bpert(:,:,:,1));
-curlphi=squeeze(bpert(:,:,:,2));
-curlz=squeeze(bpert(:,:,:,3));
-
-
-%modb=sqrt(br.^2+bphi.^2+bz.^2);
-
-% modcurl=sqrt(curlr.^2+curlphi.^2+curlz.^2);
-% [~,I] = max(modcurl,[],'all');
-% 
-% fac = modb(I) ./ modcurl(I);
-
-
-% figure
-% %quiver3(xg,yg,zg,curlr,curlphi,curlz);
-% %quiver3(rg,phig,zg,curlr,curlphi,curlz);
-% quiver(squeeze(rg(:,1,:)),squeeze(zg(:,1,:)),squeeze(curlr(:,1,:)),squeeze(curlz(:,1,:)));
-% %pixplot(squeeze(curlphi(:,:,50)))
-
-% pixplot(squeeze(curlr(:,:,50))./squeeze(br(:,:,50)))
-% caxis([-1 1])
-
-% if lplot
-% figure
-% subplot(1,2,1)
-% pixplot(squeeze(modb(:,1,:)))
-% title('Before Pert')
-% axis equal
-% end
 
 br = br + curlr;
 bphi = bphi + curlphi;
@@ -265,14 +251,6 @@ lines_out.fluxphi=fluxphi;
 lines_out.nr=numel(r);
 lines_out.nphi=numel(phi);
 lines_out.nz=numel(z);
-
-% if lplot
-% subplot(1,2,2)
-% modb=sqrt(br.^2+bphi.^2+bz.^2);
-% pixplot(squeeze(modb(:,1,:)))
-% title('After Pert')
-% axis equal
-% end
 
 
 if lsave
@@ -314,7 +292,6 @@ h5write(filename_out,'/nz',numel(z))
 
 end
 
-
 if lfieldlines
 [R,~,Z]=fieldlines_follow(lines_out,fieldlines_data.starts,fieldlines_data.phi_extent,fieldlines_data.poinc_loc,fieldlines_data.grid_extent);
 figure
@@ -328,3 +305,39 @@ end
 % H5L.delete(fid,group_name,'H5P_DEFAULT');
 % H5F.close(fid);
 % end
+function A_mn = islandWidthPerturbation(s, m, n, rho_mn, s_mn, alpha, beta, gamma)
+    % islandWidthPerturbation calculates the perturbation strength for a magnetic island.
+    %
+    % This function is vectorized to handle arrays of 's' values.
+    %
+    % Arguments:
+    % s     : An array of normalized toroidal flux values of the q = m/n surface.
+    % m     : Poloidal mode number.
+    % n     : Toroidal mode number.
+    % rho_mn: Free parameter for perturbation strength in the vacuum region.
+    % s_mn  : Normalized toroidal flux at the q = m/n surface.
+    % alpha : Free parameter alpha.
+    % beta  : Free parameter beta.
+    % gamma : Free parameter gamma.
+    %
+    % Returns:
+    % A_mn  : An array of perturbation strengths for the magnetic island at each 's'.
+
+    A_mn = zeros(size(s)); % Initialize A_mn with the same size as s
+
+    % Logical array for indexing where s is less than or equal to s_mn
+    index_s_less_equal = s <= s_mn;
+    % Logical array for indexing where s is greater than s_mn
+    index_s_greater = s > s_mn;
+
+    % Calculate A_mn for s less than or equal to s_mn
+    A_mn(index_s_less_equal) = rho_mn * alpha .* ((s(index_s_less_equal) / s_mn).^(m/2)) ...
+                               .* (1 - beta * ((s(index_s_less_equal) / s_mn).^(1/2)));
+
+    % Calculate A_mn for s greater than s_mn
+    A_mn(index_s_greater) = rho_mn * (alpha * (1 - beta) ...
+                               + gamma * (s(index_s_greater) / s_mn).^(1/2)) ...
+                               ./ ((s(index_s_greater) / s_mn).^((n+1)/2));
+end
+
+
