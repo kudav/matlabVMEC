@@ -27,16 +27,19 @@ if ~isstruct(data)
     return;
 end
 data.datatype='FIELDLINES';
-data.X_lines=data.R_lines.*cos(data.PHI_lines);
-data.Y_lines=data.R_lines.*sin(data.PHI_lines);
-data.phiend = data.PHI_lines(:,data.nsteps);
-data.dphi = double(data.phiend)/double(data.nsteps-1);
-% Do this for VMECplot
-data.ns = data.nlines;
-data.mpol = 0;
-data.nu = 2;
-data.ntor = 0;
-data.nzeta_grid = data.npoinc;
+if isfield(data,'R_lines')
+    data.X_lines=data.R_lines.*cos(data.PHI_lines);
+    data.Y_lines=data.R_lines.*sin(data.PHI_lines);
+    data.phiend = data.PHI_lines(:,data.nsteps);
+    data.dphi = double(data.phiend)/double(data.nsteps-1);
+
+    % Do this for VMECplot
+    data.ns = data.nlines;
+    data.mpol = 0;
+    data.nu = 2;
+    data.ntor = 0;
+    data.nzeta_grid = data.npoinc;
+end
 if isfield(data,'phiaxis')
     data.nfp= round(2*pi/max(data.phiaxis));
 elseif isfield(data,'phi_grid')
