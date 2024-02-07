@@ -50,7 +50,9 @@ dw=data.partvmax;
 
 mass = data.mass(1); % Assume same mass
 V = sqrt(ec.*2.*E./mass);
+clearvars E;
 Vval = V.*pitch; %Vll
+clearvars pitch; %Save some memory
 Wval = sqrt(V.^2-Vval.^2); %Vperp
 %Vval = Vval+vmax;
 
@@ -72,7 +74,10 @@ if isfield(data,'VTOR_ARR')
     VT   = permute(data.VTOR_ARR,[2 1 3]);
  vtor= interp3(data.raxis,data.phiaxis,data.zaxis,...
     VT,r,pgrid,z);   
+ clearvars VT;
+ %V=sqrt((Vval+vtor).^2+Wval.^2);
  Vval=Vval+vtor;
+ clearvars vtor;
 end
 
 
@@ -90,7 +95,7 @@ uval(uval>max(data.dist_uaxis))=max(data.dist_uaxis);
 pval(pval<min(data.dist_paxis))=min(data.dist_paxis);
 pval(pval>max(data.dist_paxis))=max(data.dist_paxis);
 
-dist=interpn(data.dist_rhoaxis,data.dist_uaxis,data.dist_paxis,data.dist_Vaxis,data.dist_Waxis,dist_norm,rhoval,uval,pval,Vval,Wval,'linear');
+dist=interpn(data.dist_rhoaxis,data.dist_uaxis,data.dist_paxis,data.dist_Vaxis,data.dist_Waxis,dist_norm,rhoval,uval,pval,Vval,Wval,'linear',0);
 
 dist = dist.*jac;
 
