@@ -109,6 +109,11 @@ if (strcmp(filename(end-1:end),'h5'))
         data.dist_Vaxis= (-data.partvmax+d4.*0.5):d4:(data.partvmax-d4.*0.5);
         data.dist_Waxis=data.partvmax.*(double(1:data.ns_prof5)-0.5)./(data.ns_prof5);
     end
+    if isfield(data,'vll_lines')
+        data.vperp=beams3d_calc_vperp(data);
+        data.v=sqrt(data.vperp.^2+data.vll_lines.^2);
+        data.pitch = data.vll_lines./data.v;
+    end
 elseif (strcmp(filename(1:12),'beams3d_diag'))
     fid=fopen(filename,'r');
     line=fgetl(fid);
