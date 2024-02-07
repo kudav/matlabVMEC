@@ -87,7 +87,8 @@ if nargin > 1
         switch varargin{i}
             case {'overview','profiles',...
                     'ba','br2d','bt2d','bz2d',...
-                    'brtor','bttor','bztor','q2d','te2d','ne2d','ti2d'}
+                    'brtor','bttor','bztor','q2d',...
+                    'te2d','ne2d','ti2d', 'vt2d'}
                 plot_type{end+1}=varargin{i}; %Make multiple plots possible
                 leq = 1;
                 if numel(varargin)>i
@@ -162,7 +163,7 @@ if nargin > 1
                 plot_type{end+1}=varargin{i}; %Make multiple plots possible
             case 'mean'
                 lmean = 1;
-            case 'contour'
+            case {'contour','contours'}
                 lcontour = 1;
                 i=i+1;
                 levels = varargin{i};
@@ -486,17 +487,23 @@ for i = 1:size(plot_type,2)
             tmp = eq.plasma.dene;
             cstring = 'Electron density [m^{-3}]';
         case 'te2d'
-                        r = eq.plasma.r;
+            r = eq.plasma.r;
             z = eq.plasma.z;
             phi=eq.plasma.phi;
             tmp = eq.plasma.te;
             cstring = 'Electron temperature [keV]';
         case 'ti2d'
-                        r = eq.plasma.r;
+            r = eq.plasma.r;
             z = eq.plasma.z;
             phi=eq.plasma.phi;
             tmp = eq.plasma.ti;
             cstring = 'Ion temperature [keV]';
+        case 'vt2d'
+            r = eq.plasma.r;
+            z = eq.plasma.z;
+            phi=eq.plasma.phi;
+            tmp = eq.plasma.vt;
+            cstring = 'Toroidal Rotation [cm/s]';            
         case 'ba'
             plot(ax{i},eq.plasma.r, squeeze(eq.fields.br(:,z0_ind,1)),linestyle, 'DisplayName','B_r');
             plot(ax{i},eq.plasma.r, squeeze(eq.fields.bt(:,z0_ind,1)),linestyle, 'DisplayName','B_t');
@@ -505,21 +512,39 @@ for i = 1:size(plot_type,2)
             ylabel(ax{i},'Magnetic Field [T]')
             legend(ax{i},'Interpreter','none');
         case 'fslice'
+            if index==1
             [~,e_ind]=min(abs(dist.energy-20));
             [~,p_ind]=min(abs(dist.pitch));
-            if fac ==1
-                plot(ax{i},dist.r, squeeze(dist.f(e_ind,p_ind,:,z0_ind,1)),linestyle,'DisplayName',['f slice - ' name] );
+            phi_ind=1;
+            tmp=squeeze(dist.f(e_ind,p_ind,:,z0_ind,phi_ind));
             else
-                plot(ax{i},dist.r, fac*squeeze(dist.f(e_ind,p_ind,:,:,1)),linestyle,'DisplayName',['f slice - ' name ', scaling factor: ' num2str(fac)]);
+                [~,e_ind]=min(abs(dist.energy-index(1)));
+                [~,p_ind]=min(abs(dist.pitch-index(2)));
+                [~,z0_ind]=min(abs(dist.z-index(3)));
+                [~,phi_ind]=min(abs(dist.phi-index(4)));
+                tmp=squeeze(dist.f(e_ind,p_ind,:,z0_ind,phi_ind));
+            end             
+            if fac ==1
+                plot(ax{i},dist.r, tmp,linestyle,'DisplayName',['f slice - ' name] );
+            else
+                plot(ax{i},dist.r, fac*tmp,linestyle,'DisplayName',['f slice - ' name ', scaling factor: ' num2str(fac)]);
             end
+            fprintf('Total: %.2e\n', squeeze(trapz(dist.r,tmp)));
             xlabel('R [cm]')
             ylabel('Fast ion distribution slice [1/cm^3/keV/dp]')
             legend(ax{i},'Interpreter','none');
         case 'denf'
+            r = dist.r;
+            phi = eq.fields.phi;
+            z = dist.z;
+            tmp = dist.denf;
+            if index==1      
+                index=z0_ind;   
+            end
             if fac == 1
-                plot(ax{i},dist.r, squeeze(dist.denf(:,z0_ind,1)),linestyle, 'DisplayName',['Denf - ' name] );
+                plot(ax{i},dist.r, squeeze(tmp(:,index,1)),linestyle, 'DisplayName',['Denf - ' name] );
             else
-                plot(ax{i},dist.r, fac*squeeze(dist.denf(:,z0_ind,1)),linestyle, 'DisplayName',['Denf - ' name ', scaling factor: ' num2str(fac)]);
+                plot(ax{i},dist.r, fac*squeeze(tmp(:,index,1)),linestyle, 'DisplayName',['Denf - ' name ', scaling factor: ' num2str(fac)]);
             end
             xlabel('R [m]')
             ylabel('Fast ion density [cm^{-3}]')
@@ -576,8 +601,12 @@ for i = 1:size(plot_type,2)
         case 'q2d'
             r = eq.fields.r;
             z = eq.fields.z;
-            tmp = (eq.fields.bt(:,:,1) .* eq.fields.r2d) ./ sqrt(eq.fields.bz(:,:,1).^2 + eq.fields.br(:,:,1).^2);
-            cstring = 'Magnetic Field B_z [T]';
+            %Quickly find minor radius
+            [~,linearIndMax]=max(eq.plasma.te(:));
+            [row,col,~]=ind2sub(size(eq.plasma.te),linearIndMax);
+            a2d=sqrt((eq.fields.r2d-eq.fields.r2d(row,col)).^2+(eq.fields.z2d-eq.fields.z2d(row,col)).^2);
+            tmp = (eq.fields.bt(:,:,1) .* a2d) ./ sqrt(eq.fields.bz(:,:,1).^2 + eq.fields.br(:,:,1).^2)./eq.fields.r2d;
+            cstring = 'Safety factor [-]';
         case 'denftor'
             r = eq.fields.r;
             phi = eq.fields.phi;
@@ -617,18 +646,18 @@ for i = 1:size(plot_type,2)
                 index=index(5);
             end
 
-			[x_fida,y_fida,z_fida] = meshgrid(dist.r./100+dr/200,dist.z./100+dz/200,mod(dist.phi(2:end-1),2*pi/5)+dphi/2);
+            [x_fida,y_fida,z_fida] = meshgrid(dist.r./100+dr/200,dist.z./100+dz/200,mod(dist.phi(2:end-1),2*pi/5)+dphi/2);
 
-			%denf=permute(tmp(:,:,2:end-1),[2 1 3]);
-			%isosurface(x_fida,y_fida,z_fida,denf,index); 
-			denf=permute(tmp(:,:,2:end-1),[3 1 2]);
-			isosurface(denf,index); 
-			rotate3d on
-			%view(2)
-			%camlight left
-			view(3)
-			camlight left
-            cstring = 'Fast ion density [m^{-3}]';            
+            %denf=permute(tmp(:,:,2:end-1),[2 1 3]);
+            %isosurface(x_fida,y_fida,z_fida,denf,index);
+            denf=permute(tmp(:,:,2:end-1),[3 1 2]);
+            isosurface(denf,index);
+            rotate3d on
+            %view(2)
+            %camlight left
+            view(3)
+            camlight left
+            cstring = 'Fast ion density [m^{-3}]';
         case 'brtor'
             r = eq.fields.r;
             phi = eq.fields.phi;
@@ -741,10 +770,10 @@ for i = 1:size(plot_type,2)
                 if fac~=1.0
                     name = [name,', scale=',num2str(fac)];
                 end
-                
+
                 %cwav_mid=sim_data.cwav_mid(channel);
                 cwav_mid=mean(spec.lambda);%+(spec.lambda(2)-spec.lambda(1));
-                
+
                 disp(['Cwav_mid_fidasim=', num2str(cwav_mid)]);
                 %cwav_mid=sim_data.cwav_mid(channel);
                 %cwav_mid = interp1(1:size(spec.lambda,1),spec.lambda,size(spec.lambda,1)/2.)-(spec.lambda(2)-spec.lambda(1))/2.;
