@@ -58,6 +58,7 @@ if isstr(file)
     birth_name = [file,'_birth.h5'];
     weight_name = [file,'_fida_weights.h5'];
     lloaded=0;
+    dist={};
 else
     lloaded=1;
     if isfield(file,'eq')
@@ -103,7 +104,6 @@ levels=2;
 linput=0;
 n_fida=-1;
 sim_data = {};
-dist={};
 channel = 0;
 linestyle = '-';
 color='k';

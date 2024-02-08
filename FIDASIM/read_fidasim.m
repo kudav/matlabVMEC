@@ -11,7 +11,7 @@ end
 nml_name=[runid,'_inputs.dat'];
 if isfile(nml_name)
 input=read_namelist(nml_name,'fidasim_inputs');
-
+disp(input.result_dir)
 dist_name=splitfn(input.distribution_file);
 eq_name=splitfn(input.equilibrium_file);
 geom_name=splitfn(input.geometry_file);
