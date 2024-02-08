@@ -45,18 +45,45 @@ function [ ax, n_fida ] = plot_fidasim(file,varargin)
 
 ec=1.6021773300E-19; % Charge of an electron (leave alone)
 
-if (strcmp(file(end-1:end),'h5'))
-    disp('ERROR: Only give runid (dist and eq files are loaded automatically!');
-    disp(['       Filename: ' file]);
+if isstr(file)
+    if (strcmp(file(end-1:end),'h5'))
+        disp('ERROR: Only give runid (dist and eq files are loaded automatically!');
+        disp(['       Filename: ' file]);
+    end
+    dist_name = [file, '_distribution.h5'];
+    eq_name = [file,'_equilibrium.h5'];
+    neut_name = [file, '_neutrals.h5'];
+    spec_name = [file,'_spectra.h5'];
+    geom_name = [file,'_geometry.h5'];
+    birth_name = [file,'_birth.h5'];
+    weight_name = [file,'_fida_weights.h5'];
+    lloaded=0;
+else
+    lloaded=1;
+    if isfield(file,'eq')
+        eq=file.eq;
+    end
+    if isfield(file,'dist')
+        dist=file.dist;
+    end
+    if isfield(file,'geom')
+        geom=file.geom;
+    end
+    if isfield(file,'neut')
+        neut=file.neut;
+    end
+    if isfield(file,'weight')
+        weight=file.weight;
+    end
+    if isfield(file,'input')
+        input=file.input;
+    end
+    if isfield(file,'birth')
+        birth=file.birth;
+    end    
 end
 
-dist_name = [file, '_distribution.h5'];
-eq_name = [file,'_equilibrium.h5'];
-neut_name = [file, '_neutrals.h5'];
-spec_name = [file,'_spectra.h5'];
-geom_name = [file,'_geometry.h5'];
-birth_name = [file,'_birth.h5'];
-weight_name = [file,'_fida_weights.h5'];
+
 
 lsave = 0;
 plot_type = {};
@@ -211,6 +238,7 @@ if nargin > 1
     end
 end
 
+if ~lloaded
 if linput
     input=read_namelist([file,'_inputs.dat'],'fidasim_inputs');
 end
@@ -299,7 +327,7 @@ if lbirth
         lgeom=0;
     end
 end
-
+end
 
 if ischar(channel)
     chan_description = channel;
