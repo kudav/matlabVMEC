@@ -22,6 +22,7 @@ function [ ax, n_fida ] = plot_fidasim(file,varargin)
 %      plot_fidasim(runid,'pitch'); %Pitch dist, int. over real space
 %      plot_fidasim(runid,'ep_'); %E-p dist.,  int. over real space
 %      !!! '_' can be '2d' (RZ plane) or 'tor' (midplane)
+%      plot_fidasim(runid,'q2d'); %Approx. of safety factor
 %      plot_fidasim(runid,'ndensvert'); %Neutral density, vertical
 %      plot_fidasim(runid,'ndenshorz'); %Neutral density, horizontal
 %      plot_fidasim(runid,'ax', ax); %Figure handles for sharing plots
@@ -55,6 +56,7 @@ neut_name = [file, '_neutrals.h5'];
 spec_name = [file,'_spectra.h5'];
 geom_name = [file,'_geometry.h5'];
 birth_name = [file,'_birth.h5'];
+weight_name = [file,'_fida_weights.h5'];
 
 lsave = 0;
 plot_type = {};
@@ -67,6 +69,7 @@ lspec = 0;
 lneut = 0;
 lmean=0;
 lgeom =0;
+lweight=0;
 lbirth=0;
 lcontour=0;
 levels=2;
@@ -81,6 +84,8 @@ index=1;
 rotation=0;
 lpassive=0;
 lbrems=0;
+tmp=[];
+tmp2=[];
 if nargin > 1
     i = 1;
     while i < nargin
@@ -110,6 +115,17 @@ if nargin > 1
                         index = varargin{i};
                     end
                 end
+            case {'weights','weight_dist','weights_dist'}
+                plot_type{end+1}=varargin{i}; %Make multiple plots possible
+                ldist = 1;
+                lweight=1;
+                lgeom=1;
+                if numel(varargin)>i
+                    if ~isstr(varargin{i+1})
+                        i=i+1;
+                        index = varargin{i};
+                    end
+                end                
             case{'ndensvert', 'ndenshorz', 'ndenscross'}
                 plot_type{end+1}=varargin{i}; %Make multiple plots possible
                 lneut = 1;
@@ -211,24 +227,11 @@ if ldist
     nz = double(dist.nz);
     if ndims(dist.f) == 5
         dphi = dist.phi(2) - dist.phi(1);
-        % Area
-        %area=dr*100.*dz*100;
-
         nphi=double(dist.nphi);
         area=dr.*dz;
         % Volume (function of R)
         vol = dist.r.*dphi.*area;
         vol2d=repmat(vol,[1 dist.nz dist.nphi]);
-        %disp(['Total vol2d  : ', num2str(sum(vol2d,'all'))])
-
-        tmp = pi*((dist.r(end)+dr).^2-dist.r(1).^2)*(dist.z(end)-dist.z(1));
-        %disp(['Total cyl vol: ', num2str(sum(tmp,'all'))]);
-        %Correct for trapz(ones(4,1)=3 (edges not correctly accounted for)
-        z = trapz(dz*nz/(nz-1),ones(nz,1));
-        rdphi = repmat(dist.r.*z,1,dist.nphi);
-        tmp = squeeze(trapz(dr*nr/(nr-1),trapz(dphi*nphi/(nphi-1),rdphi,2)));
-
-        %disp(['Total int vol: ', num2str(sum(tmp,'all'))]);
         n_fida = sum(dist.denf.*vol2d,'all');
     else
         n_fida = 2*pi*dr*dz*sum(dist.r.*sum(squeeze(dist.denf(:,:,1)),2)); %Axisymmetric only.
@@ -248,6 +251,9 @@ if leq
     [~,z0_ind]=min(abs(eq.fields.z));
 end
 
+if lweight
+    weight= read_hdf5(weight_name);
+end
 if lneut
     neut = read_hdf5(neut_name);
     if ~isstruct(neut)
@@ -747,6 +753,34 @@ for i = 1:size(plot_type,2)
             cstring = 'Beam neutral density [1/cm^3]';
             c = colorbar;
             c.Label.String = cstring;
+        case {'weights','weights_dist','weight_dist'}
+            if numel(index)==2
+                [~,index(1)]=min(abs(weight.lambda-index(1)));
+            else
+                [~,index(1)]=min(abs(weight.lambda-660));%wvl
+                index(2) = 1;%channel
+            end
+            tmp=squeeze(weight.weight(index(1),:,:,index(2)));
+            if strcmp(plot_type{i}(end-3:end),'dist')
+                tmp2=squeeze(weight.mean_f(:,:,index(2)));
+            end
+            if lcontour
+                contour(ax{i},weight.energy,weight.pitch,tmp',levels,linestyle,'DisplayName',name)
+            else
+                imagesc(ax{i},weight.energy,weight.pitch,tmp');
+
+            end
+            if ~isempty(tmp2)
+                currentLimits=clim;
+                contour(ax{i},weight.energy,weight.pitch,tmp2',5,linestyle,'LineColor','k','DisplayName','FI Dist.')
+                clim(currentLimits);
+            end
+            c = colorbar(ax{i});
+            c.Label.String = '[ph*cm/(s*fast ion)]';
+            xlabel('Energy [keV')
+            ylabel('Pitch [-]')
+            ylim([-1 1])
+            title(sprintf('%s, R=%.2fcm',char(deblank(geom.spec.id(index(2)))), geom.spec.radius(index(2))));
         case 'fida'
 
         case 'spectrum'
@@ -939,7 +973,7 @@ for i = 1:size(plot_type,2)
     %if numel(plot_type{i}) > 2
     if strcmp(plot_type{i}(end-1:end),'2d')
         if lcontour
-            contour(ax{i},r*fac,z*fac,squeeze(tmp(:,:,index))',levels,linestyle,'DisplayName',name) %,'LineWidth',4.0
+            contour(ax{i},r*fac,z*fac,squeeze(tmp(:,:,index))',levels,linestyle,'DisplayName',name)
         else
             imagesc(ax{i},r*fac,z*fac,tmp(:,:,index)');
             c = colorbar(ax{i});
