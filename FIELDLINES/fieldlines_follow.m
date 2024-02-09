@@ -1,16 +1,40 @@
 function [R_lines,PHI_lines,Z_lines] = fieldlines_follow(in_data,start_loc,phi_extent,poinc_loc,grid_extent)
-%FIELDLINES_FOLLOW Summary of this function goes here
-%   Detailed explanation goes here
+%FIELDLINES_FOLLOW follows fieldlines from either a FIELDLINES or BEAMS3D
+%run. It uses only the B_X components, so it can also be used e.g. from the
+%beams3d_apply_bpert function
+%
+% Input parameters:
+% in_data: data read by read_beams3d or read_fieldlines
+% start_loc: num_lines by 2 array of R, Z starting positions
+% phi_extent: toroidal range to integrate over
+% poinc_loc: phi position to collect the poincare plot at
+% grid_extent: R, Z grid extent
+%
+% Output parameters:
+% R_lines: R coordinates at the poincare cross section
+% PHI_lines: PHI coordinates at the poincare cross section
+% Z_lines: Z coordinates at the poincare cross section
+%
+% Example usage:
+% starts=[linspace(1.6,2.1,200)',repmat(0.03,200,1)];
+% [pert] = beams3d_apply_bpert('beams3d_test.h5',5e-2,1,2,'ferrari','vacstrum');
+% [R,PHI,Z]=fieldlines_follow(pert,starts,[0.0, 1000.0],2.0,[1.2,2.1,-.8,.8]);
+%
+% Maintained by: David Kulla (david.kulla@ipp.mpg.de)
+% Version:       1.00
+% Date  09/02/2024
+
+
 nstart = size(start_loc,1);
 [r,phi,z] = ndgrid(in_data.raxis,in_data.phiaxis,in_data.zaxis);
 maxphi=max(in_data.phiaxis);
-    if ~strcmp(in_data.datatype,'FIELDLINES')
-        dRdphi = r.*in_data.B_R ./ in_data.B_PHI;
-dZdphi = r.*in_data.B_Z ./ in_data.B_PHI;
-    else
-        dRdphi=in_data.B_R;
-        dZdphi=in_data.B_Z;
-    end
+if ~strcmp(in_data.datatype,'FIELDLINES')
+    dRdphi = r.*in_data.B_R ./ in_data.B_PHI;
+    dZdphi = r.*in_data.B_Z ./ in_data.B_PHI;
+else
+    dRdphi=in_data.B_R;
+    dZdphi=in_data.B_Z;
+end
 
 
 %Setup derivatives
@@ -39,54 +63,11 @@ dZ_F = griddedInterpolant(r,phi,z,dZdphi,'cubic');
         direction=-1;
     end
 
-options = odeset('RelTol',1e-5,'Events',@events); %'vectorized'
-% options = odeset('Events',@events,'OutputFcn',@odeplot,'OutputSel',1,...
-%    'Refine',refine);
-%parpool(4)
-% R_lines = zeros(nstart,numel(phi_extent));
-% Z_lines = zeros(nstart,numel(phi_extent));
-% PHI_lines = zeros(nstart,numel(phi_extent));
-% R_lines(:,1)=start_loc(:,1);
-% Z_lines(:,1)=start_loc(:,2);
-% PHI_lines(:,1)=phi_extent;
+options = odeset('RelTol',1e-5,'Events',@events);
 starts = reshape(start_loc,1,[]);
-[phi,y,phie,ye,ie] = ode89(@f,[phi_extent(1) phi_extent(2)],starts,options);
+[~,~,phie,ye,~] = ode89(@f,[phi_extent(1) phi_extent(2)],starts,options);
 R_lines=ye(:,1:nstart)';
 Z_lines=ye(:,nstart+1:end)';
 PHI_lines=repmat(phie(:),1,nstart)';
-%     R_lines(:,i)=y(end,1:nstart)';
-%     Z_lines(:,i)=y(end,nstart+1:end)';
-%     PHI_lines(:,i)=phi(end);
 
 end
-
-
-
-%
-% function [R_lines,Z_lines] = fieldlines_follow(in_data,start_loc,phi_extent)
-% %FIELDLINES_FOLLOW Summary of this function goes here
-% %   Detailed explanation goes here
-%
-% [r,phi,z] = ndgrid(in_data.raxis,in_data.phiaxis,in_data.zaxis);
-%
-% dRdphi = r.*in_data.B_R ./ in_data.B_PHI;
-% dZdphi = r.*in_data.B_Z ./ in_data.B_PHI;
-%
-% dR_F = griddedInterpolant(r,phi,z,dRdphi,'cubic');
-% dZ_F = griddedInterpolant(r,phi,z,dZdphi,'cubic');
-%
-%
-%     function dqdphi = f(phi,q)
-%         dqdphi = [0; 0];
-%         dqdphi(1) = dR_F(q(1),phi,q(2));
-%         dqdphi(2) = dZ_F(q(1),phi,q(2));
-%     end
-%
-% % options = odeset('Events',@events,'OutputFcn',@odeplot,'OutputSel',1,...
-% %    'Refine',refine);
-% [t,y] = ode45(@f,[phi_extent phi_extent+2*pi],start_loc);
-% R_lines=y(:,1);
-% Z_lines=y(:,2);
-% %    options = odeset(options,'InitialStep',t(nt)-t(nt-refine),...
-% %       'MaxStep',t(nt)-t(1));
-% end
