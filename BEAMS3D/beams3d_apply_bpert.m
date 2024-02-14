@@ -138,32 +138,28 @@ end
 % end
 
 
-
+fluxphi = fluxir .* cos(mi.*uarr - ni .* phig-phase);%.*rg;
 
 %%
-dr = r(2)-r(1);
-dphi = phi(2)-phi(1);
-dz = z(2)-z(1);
-
+%%SWITCH X and Y components of gradient because of matlab reasons...
 switch calculation
     case 'hirv'
-        fluxphi = fluxir .* cos(mi.*uarr + ni .* phig-phase);
-        fluxphi(sarr>1.5)=0;
+        fluxphi(sarr>1.05)=0;
         %Jacobsen formulation: B_pert = rot(alpha * B)
         brc = br.* fluxphi;
         bphic = bphi.* fluxphi;
         bzc = bz.* fluxphi;
         %Curl in cylindrical coordinates
         % Calculate the gradients of the components of B
-        [~, dbrcdphi, dbrcdz] = gradient(brc, dr, dphi, dz);
-        [~, ~, dbphicdz] = gradient(bphic, dr, dphi, dz);
-        [dbzcdr, dbzcdphi, ~] = gradient(bzc, dr, dphi, dz);
+        [dbrcdphi, ~,  dbrcdz] = gradient(brc, phi, r, z);
+        [~, ~, dbphicdz] = gradient(bphic, phi, r, z);
+        [dbzcdphi, dbzcdr, ~] = gradient(bzc, phi, r, z);
 
         % Calculate the product r*bphic
         rbphic = rg .* bphic;
 
         % Now take the gradient of rbphic with respect to r
-        [drbphicdr, ~, ~] = gradient(rbphic, dr, dphi, dz);
+        [~,drbphicdr, ~] = gradient(rbphic, phi, r, z);
 
         % Calculate each component of the curl
         % Curl in cylindrical (r, phi, z) components
@@ -174,28 +170,47 @@ switch calculation
         % Combine the components to form the curl vector
         bpert = cat(4, curl_br, curl_bphi, curl_bz);
     case 'strum'
-        fluxphi = fluxir .* cos(mi.*uarr - ni .* phig-phase);
-        fluxphi(sarr>1.5)=0;
+        fluxphi(sarr>1.05)=0;
         %Strumberger formulation B_pert = gradPsitilde x gradPhi
         %, dr, dphi, dz
         %[gradB, ~, ~] = calculateFieldProperties(lines_out);
-        [dBdr, dBdphi, dBdz] = gradient(fluxphi, dr, dphi, dz);
-        gradphi=permute(repmat(gradient(phi,dphi),1,numel(r),numel(z),3),[2,1,3,4]);
+        %gradphi=permute(repmat(gradient(phi,dphi),1,numel(r),numel(z),3),[2,1,3,4]);
+        % [dBdr, dBdphi, dBdz] = gradient(permute(fluxphi,[2 1 3]), r, phi, z);
+        %  gradphi=repmat(phi,1,size(sarr,1),size(sarr,3));
+        %  [dphidr, dphidphi, dphidz] = gradient(gradphi, r, phi, z);
+
+         [dBdphi, dBdr, dBdz] = gradient(fluxphi, phi, r, z);
+         gradphi=permute(repmat(phi,1,size(sarr,1),size(sarr,3)),[2 1 3]);
+         [dphidphi, dphidr, dphidz] = gradient(gradphi, phi, r, z);
+        gradphi = cat(4, dphidr, dphidphi, dphidz);
         gradB = cat(4, dBdr, dBdphi, dBdz); % 4th dimension represents the vector components
+        % Xcomp=gradB(:,:,:,1).*cos(gradB(:,:,:,2));
+        % Ycomp=gradB(:,:,:,1).*sin(gradB(:,:,:,2));
+        % gradB(:,:,:,1)=Xcomp;
+        % gradB(:,:,:,2)=Ycomp;
+        % Xcomp=gradphi(:,:,:,1).*cos(gradphi(:,:,:,2));
+        % Ycomp=gradphi(:,:,:,1).*sin(gradphi(:,:,:,2));
+        % gradphi(:,:,:,1)=Xcomp;
+        % gradphi(:,:,:,2)=Ycomp;
+
         bpert=cross(gradB,gradphi);
+
+        % Xcomp=sqrt(bpert(:,:,:,1).^2+bpert(:,:,:,2).^2);
+        % Ycomp=atan2(bpert(:,:,:,2),bpert(:,:,:,1));
+        % bpert(:,:,:,1)=Xcomp;
+        % bpert(:,:,:,2)=Ycomp;
     case 'ferrari'
-        fluxphi = fluxir .* cos(mi.*uarr + ni .* phig-phase);
         fluxphi(sarr>1.5)=0;        
         brc = br;%.* fluxphi;
         bphic = bphi.* fluxphi;
         bzc = bz;%.* fluxphi;        
-        %[curl_br,curl_bphi,curl_bz,~] = curl(rg,phig,zg,brc,bphic,bzc);
-        [curl_br,curl_bphi,curl_bz,~] =  curl(brc,bphic,bzc);
+        [curl_br,curl_bphi,curl_bz,~] = curl(rg,phig,zg,brc,bphic,bzc);
+        %[curl_br,curl_bphi,curl_bz,~] =  curl(brc,bphic,bzc);
         bpert = cat(4, curl_br, curl_bphi, curl_bz);
 end
-curlr=squeeze(bpert(:,:,:,1));
+curlr=squeeze(bpert(:,:,:,1));%.*rg;
 curlphi=squeeze(bpert(:,:,:,2));
-curlz=squeeze(bpert(:,:,:,3));
+curlz=squeeze(bpert(:,:,:,3));%.*rg;
 curlr(isnan(curlr)|isinf(curlr)|sarr>1) = 0;
 curlphi(isnan(curlphi)|isinf(curlphi)|sarr>1) = 0;
 curlz(isnan(curlz)|isinf(curlz)|sarr>1) = 0;
