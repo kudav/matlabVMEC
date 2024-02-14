@@ -27,6 +27,12 @@ function [R_lines,PHI_lines,Z_lines] = fieldlines_follow(in_data,start_loc,phi_e
 
 nstart = size(start_loc,1);
 [r,phi,z] = ndgrid(in_data.raxis,in_data.phiaxis,in_data.zaxis);
+if numel(grid_extent)==0
+    grid_extent(1)=in_data.raxis(1);
+    grid_extent(2)=in_data.raxis(end);
+    grid_extent(3)=in_data.zaxis(1);
+    grid_extent(4)=in_data.raxis(end);
+end
 maxphi=max(in_data.phiaxis);
 if ~strcmp(in_data.datatype,'FIELDLINES')
     dRdphi = r.*in_data.B_R ./ in_data.B_PHI;
