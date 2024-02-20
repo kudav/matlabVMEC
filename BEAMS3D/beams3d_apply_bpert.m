@@ -109,7 +109,8 @@ switch form
         alpha = 0.04;
         beta = 0.87;
         gamma = 0.01;
-        s_21 = 0.2693;
+        %s_21 = 0.2693;
+        s_21 = 0.5693;
         fluxir = islandWidthPerturbation(sarr, mi, ni, fluxi0, s_21, alpha, beta, gamma);
     case 'vacstrum'
         %Strumberger 2008, Perturbation 2: fluxi0=0.1
@@ -245,15 +246,15 @@ bphi = bphi + curlphi;
 bz = bz + curlz;
 
 if llines
-lines_out.B_R = br./bphi.*rnorm;
-lines_out.B_Z = bz./bphi.*rnorm;
+br = br./bphi.*rnorm;
+bz = bz./bphi.*rnorm;
 lines_out.datatype='FIELDLINES';
 disp('Converted BR and BZ for FIELDLIENS!')
 else
-lines_out.B_R = br;
-lines_out.B_Z = bz;
 lines_out.datatype='OTHER';
 end
+lines_out.B_R = br;
+lines_out.B_Z = bz;
 lines_out.B_PHI = bphi;
 lines_out.raxis = r;
 lines_out.zaxis=z;
@@ -273,36 +274,39 @@ if lsave
 %end_state=2.*ones(size(end_state));
 %rbphi = h5read(filename_out,'/B_PHI');
 %if sum(size(rbphi)-size(bphi))~=0
-delete_hdf5_group(filename_out,'/B_R');
-h5create(filename_out,'/B_R',size(br));
-delete_hdf5_group(filename_out,'/B_PHI');
-h5create(filename_out,'/B_PHI',size(br));
-delete_hdf5_group(filename_out,'/B_Z');
-h5create(filename_out,'/B_Z',size(br));
-delete_hdf5_group(filename_out,'/raxis');
-h5create(filename_out,'/raxis',size(r));
-delete_hdf5_group(filename_out,'/phiaxis');
-h5create(filename_out,'/phiaxis',size(phi));
-delete_hdf5_group(filename_out,'/zaxis');
-h5create(filename_out,'/zaxis',size(z));
-delete_hdf5_group(filename_out,'/nr');
-h5create(filename_out,'/nr',1);
-delete_hdf5_group(filename_out,'/nphi');
-h5create(filename_out,'/nphi',1);
-delete_hdf5_group(filename_out,'/nz');
-h5create(filename_out,'/nz',1);
-%delete_hdf5_group(filename_out,'/end_state');
-%h5create(filename_out,'/end_state',size(end_state));
-%end
-h5write(filename_out,'/B_R',br)
-h5write(filename_out,'/B_PHI',bphi)
-h5write(filename_out,'/B_Z',bz)
-h5write(filename_out,'/raxis',r)
-h5write(filename_out,'/phiaxis',phi)
-h5write(filename_out,'/zaxis',z)
-h5write(filename_out,'/nr',numel(r))
-h5write(filename_out,'/nphi',numel(phi))
-h5write(filename_out,'/nz',numel(z))
+write_hdf5(filename_out,lines_out);
+% if isfile(filename_out)
+% delete_hdf5_group(filename_out,'/B_R');
+% delete_hdf5_group(filename_out,'/B_PHI');
+% delete_hdf5_group(filename_out,'/B_Z');
+% delete_hdf5_group(filename_out,'/raxis');
+% delete_hdf5_group(filename_out,'/phiaxis');
+% delete_hdf5_group(filename_out,'/zaxis');
+% delete_hdf5_group(filename_out,'/nr');
+% delete_hdf5_group(filename_out,'/nphi');
+% delete_hdf5_group(filename_out,'/nz');
+% end
+% h5create(filename_out,'/B_R',size(br));
+% h5create(filename_out,'/B_PHI',size(br));
+% h5create(filename_out,'/B_Z',size(br));
+% h5create(filename_out,'/raxis',size(r));
+% h5create(filename_out,'/phiaxis',size(phi));
+% h5create(filename_out,'/zaxis',size(z));
+% h5create(filename_out,'/nr',1);
+% h5create(filename_out,'/nphi',1);
+% h5create(filename_out,'/nz',1);
+% %delete_hdf5_group(filename_out,'/end_state');
+% %h5create(filename_out,'/end_state',size(end_state));
+% %end
+% h5write(filename_out,'/B_R',br)
+% h5write(filename_out,'/B_PHI',bphi)
+% h5write(filename_out,'/B_Z',bz)
+% h5write(filename_out,'/raxis',r)
+% h5write(filename_out,'/phiaxis',phi)
+% h5write(filename_out,'/zaxis',z)
+% h5write(filename_out,'/nr',numel(r))
+% h5write(filename_out,'/nphi',numel(phi))
+% h5write(filename_out,'/nz',numel(z))
 %h5write(filename_out,'/end_state',end_state)
 
 end
