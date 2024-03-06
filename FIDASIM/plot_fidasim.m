@@ -20,8 +20,11 @@ function [ ax, n_fida ] = plot_fidasim(file,varargin)
 %      plot_fidasim(runid,'fdenf_'); %FI density on RZ plane from f
 %      plot_fidasim(runid,'energy'); %Energy dist, int. over real space
 %      plot_fidasim(runid,'pitch'); %Pitch dist, int. over real space
-%      plot_fidasim(runid,'ep_'); %E-p dist.,  int. over real space
+%      plot_fidasim(runid,'ep2d'); %E-p dist.,  int. over real space
 %      !!! '_' can be '2d' (RZ plane) or 'tor' (midplane)
+%      plot_fidasim(runid,'ep2d',[R PHI Z]); %E-p dist., at spatial point
+%      plot_fidasim(runid,'ep2d',[R1 R2 P1 P2 Z1 Z2]); %E-p int over
+%       spatial range
 %      plot_fidasim(runid,'q2d'); %Approx. of safety factor
 %      plot_fidasim(runid,'ndensvert'); %Neutral density, vertical
 %      plot_fidasim(runid,'ndenshorz'); %Neutral density, horizontal
@@ -59,6 +62,7 @@ if isstr(file)
     weight_name = [file,'_fida_weights.h5'];
     lloaded=0;
     dist={};
+    name = file;
 else
     lloaded=1;
     if isfield(file,'eq')
@@ -66,6 +70,23 @@ else
     end
     if isfield(file,'dist')
         dist=file.dist;
+        dr = dist.r(2)-dist.r(1);
+        dz = dist.z(2)-dist.z(1);
+        nr = double(dist.nr);
+        nz = double(dist.nz);
+        if ndims(dist.f) == 5
+            dphi = dist.phi(2) - dist.phi(1);
+            nphi=double(dist.nphi);
+            area=dr.*dz;
+            % Volume (function of R)
+            vol = dist.r.*dphi.*area;
+            vol2d=repmat(vol,[1 dist.nz dist.nphi]);
+            n_fida = sum(dist.denf.*vol2d,'all');
+        else
+            n_fida = 2*pi*dr*dz*sum(dist.r.*sum(squeeze(dist.denf(:,:,1)),2)); %Axisymmetric only.
+        end
+
+        [~,z0_ind]=min(abs(dist.z));
     end
     if isfield(file,'geom')
         geom=file.geom;
@@ -76,12 +97,18 @@ else
     if isfield(file,'weight')
         weight=file.weight;
     end
-    if isfield(file,'input')
-        input=file.input;
-    end
+
     if isfield(file,'birth')
         birth=file.birth;
-    end    
+    end
+    if isfield(file,'input')
+        input=file.input;
+        name=input.runid;
+        file=input.runid;
+    else
+        name='FIDASIM';
+        file='LOADED FIDASIM';
+    end
 end
 
 
@@ -90,7 +117,7 @@ lsave = 0;
 plot_type = {};
 ax = {};
 fac = 1;
-name = file;
+
 leq = 0;
 ldist = 0;
 lspec = 0;
@@ -111,6 +138,7 @@ index=1;
 rotation=0;
 lpassive=0;
 lbrems=0;
+lsep=0;
 tmp=[];
 tmp2=[];
 if nargin > 1
@@ -142,6 +170,9 @@ if nargin > 1
                         index = varargin{i};
                     end
                 end
+            case {'lcfs','sep','separatrix'}
+                lsep=1;
+                leq=1;
             case {'weights','weight_dist','weights_dist'}
                 plot_type{end+1}=varargin{i}; %Make multiple plots possible
                 ldist = 1;
@@ -152,7 +183,7 @@ if nargin > 1
                         i=i+1;
                         index = varargin{i};
                     end
-                end                
+                end
             case{'ndensvert', 'ndenshorz', 'ndenscross'}
                 plot_type{end+1}=varargin{i}; %Make multiple plots possible
                 lneut = 1;
@@ -239,94 +270,94 @@ if nargin > 1
 end
 
 if ~lloaded
-if linput
-    input=read_namelist([file,'_inputs.dat'],'fidasim_inputs');
-end
-
-if ldist
-    dist = read_hdf5(dist_name);
-    if ~isstruct(dist)
-        disp('ERROR: Distribution file not found, check filename!');
-        disp(['       Filename: ' file]);
-    end
-    dr = dist.r(2)-dist.r(1);
-    dz = dist.z(2)-dist.z(1);
-    nr = double(dist.nr);
-    nz = double(dist.nz);
-    if ndims(dist.f) == 5
-        dphi = dist.phi(2) - dist.phi(1);
-        nphi=double(dist.nphi);
-        area=dr.*dz;
-        % Volume (function of R)
-        vol = dist.r.*dphi.*area;
-        vol2d=repmat(vol,[1 dist.nz dist.nphi]);
-        n_fida = sum(dist.denf.*vol2d,'all');
-    else
-        n_fida = 2*pi*dr*dz*sum(dist.r.*sum(squeeze(dist.denf(:,:,1)),2)); %Axisymmetric only.
+    if linput
+        input=read_namelist([file,'_inputs.dat'],'fidasim_inputs');
     end
 
-    [~,z0_ind]=min(abs(dist.z));
-end
-if leq
-    eq = read_hdf5(eq_name);
-    if ~isstruct(eq)
-        disp('ERROR: Equilbirium file not found, check filename!');
-        disp(['       Filename: ' file]);
-        eq={};
-        eq.fields.z=dist.z;
-        eq.fields.r=dist.r;
-    end
-    [~,z0_ind]=min(abs(eq.fields.z));
-end
+    if ldist
+        dist = read_hdf5(dist_name);
+        if ~isstruct(dist)
+            disp('ERROR: Distribution file not found, check filename!');
+            disp(['       Filename: ' file]);
+        end
+        dr = dist.r(2)-dist.r(1);
+        dz = dist.z(2)-dist.z(1);
+        nr = double(dist.nr);
+        nz = double(dist.nz);
+        if ndims(dist.f) == 5
+            dphi = dist.phi(2) - dist.phi(1);
+            nphi=double(dist.nphi);
+            area=dr.*dz;
+            % Volume (function of R)
+            vol = dist.r.*dphi.*area;
+            vol2d=repmat(vol,[1 dist.nz dist.nphi]);
+            n_fida = sum(dist.denf.*vol2d,'all');
+        else
+            n_fida = 2*pi*dr*dz*sum(dist.r.*sum(squeeze(dist.denf(:,:,1)),2)); %Axisymmetric only.
+        end
 
-if lweight
-    weight= read_hdf5(weight_name);
-end
-if lneut
-    neut = read_hdf5(neut_name);
-    if ~isstruct(neut)
-        disp('ERROR: Neutrals file not found, check filename!');
-        disp(['       Filename: ' file]);
+        [~,z0_ind]=min(abs(dist.z));
     end
-    neut.dens = neut.fdens+neut.hdens+neut.tdens;%+neut.dcxdens+neut.halodens;
-    neut.dens=squeeze(sum(neut.dens,1));%Sum over all levels
-    neut.grid.vol = repmat(mean(diff(neut.grid.x))*mean(diff(neut.grid.y))*mean(diff(neut.grid.z)),size(neut.grid.x_grid));
-    neut.nparts=neut.dens.*neut.grid.vol;
-    nneutrals=1.d6*input.pinj/ (1.d3*input.einj*ec...
-        *( input.current_fractions(1)      ...
-        +  input.current_fractions(2)/2.d0 ...
-        +  input.current_fractions(3)/3.d0 ) );
-    if index==1
-        [~,index]=min(abs(neut.grid.z));
+    if leq
+        eq = read_hdf5(eq_name);
+        if ~isstruct(eq)
+            disp('ERROR: Equilbirium file not found, check filename!');
+            disp(['       Filename: ' file]);
+            eq={};
+            eq.fields.z=dist.z;
+            eq.fields.r=dist.r;
+        end
+        [~,z0_ind]=min(abs(eq.fields.z));
     end
-end
 
-if lspec
-    spec = read_hdf5(spec_name);
-    if ~isstruct(spec)
-        disp('ERROR: Spectra file not found, check filename!');
-        disp(['       Filename: ' file]);
+    if lweight
+        weight= read_hdf5(weight_name);
     end
-    %[~,I] = sort(spec.radius);
+    if lneut
+        neut = read_hdf5(neut_name);
+        if ~isstruct(neut)
+            disp('ERROR: Neutrals file not found, check filename!');
+            disp(['       Filename: ' file]);
+        end
+        neut.dens = neut.fdens+neut.hdens+neut.tdens;%+neut.dcxdens+neut.halodens;
+        neut.dens=squeeze(sum(neut.dens,1));%Sum over all levels
+        neut.grid.vol = repmat(mean(diff(neut.grid.x))*mean(diff(neut.grid.y))*mean(diff(neut.grid.z)),size(neut.grid.x_grid));
+        neut.nparts=neut.dens.*neut.grid.vol;
+        nneutrals=1.d6*input.pinj/ (1.d3*input.einj*ec...
+            *( input.current_fractions(1)      ...
+            +  input.current_fractions(2)/2.d0 ...
+            +  input.current_fractions(3)/3.d0 ) );
+        if index==1
+            [~,index]=min(abs(neut.grid.z));
+        end
+    end
 
-end
-if lgeom
-    geom = read_hdf5(geom_name);
-    if ~isstruct(geom)
-        disp('ERROR: Geometry file not found, check filename!');
-        disp(['       Filename: ' file]);
-        lgeom=0;
-    end
-end
+    if lspec
+        spec = read_hdf5(spec_name);
+        if ~isstruct(spec)
+            disp('ERROR: Spectra file not found, check filename!');
+            disp(['       Filename: ' file]);
+        end
+        %[~,I] = sort(spec.radius);
 
-if lbirth
-    birth = read_hdf5(birth_name);
-    if ~isstruct(birth)
-        disp('ERROR: Birth file not found, check filename!');
-        disp(['       Filename: ' file]);
-        lgeom=0;
     end
-end
+    if lgeom
+        geom = read_hdf5(geom_name);
+        if ~isstruct(geom)
+            disp('ERROR: Geometry file not found, check filename!');
+            disp(['       Filename: ' file]);
+            lgeom=0;
+        end
+    end
+
+    if lbirth
+        birth = read_hdf5(birth_name);
+        if ~isstruct(birth)
+            disp('ERROR: Birth file not found, check filename!');
+            disp(['       Filename: ' file]);
+            lgeom=0;
+        end
+    end
 end
 
 if ischar(channel)
@@ -481,6 +512,26 @@ for i = 1:size(plot_type,2)
                 [~,z0_ind]=min(abs(eq.fields.z-index(3)));
                 fprintf('R=%.2f, Phi=%.2f, Z=%.2f\n',eq.fields.r(r0_ind),eq.fields.phi(phi0_ind),eq.fields.z(z0_ind))
                 tmp=squeeze(dist.f(:,:,r0_ind,z0_ind,phi0_ind));
+            elseif numel(index)==6
+                [~,r0_ind]=min(abs(eq.fields.r-index(1)));
+                [~,phi0_ind]=min(abs(eq.fields.phi-index(3)));
+                [~,z0_ind]=min(abs(eq.fields.z-index(5)));
+                [~,r1_ind]=min(abs(eq.fields.r-index(2)));
+                [~,phi1_ind]=min(abs(eq.fields.phi-index(4)));
+                [~,z1_ind]=min(abs(eq.fields.z-index(6)));     
+                if phi0_ind==phi1_ind
+                    phi1_ind=phi0_ind+1;
+                end
+                if r0_ind==r1_ind
+                    r1_ind=r0_ind+1;
+                end   
+                if z0_ind==z1_ind
+                    z1_ind=z0_ind+1;
+                end                
+                fprintf('R=%.2f, Phi=%.2f, Z=%.2f\n',eq.fields.r(r0_ind),eq.fields.phi(phi0_ind),eq.fields.z(z0_ind))
+                tmp = squeeze(trapz(dist.phi(phi0_ind:phi1_ind),trapz(dist.z(z0_ind:z1_ind),dist.f(:,:,r0_ind:r1_ind,z0_ind:z1_ind,phi0_ind:phi1_ind),4),5));
+                rtmp = permute(repmat(dist.r(r0_ind:r1_ind),1,size(tmp,1),size(tmp,2),1),[2,3,1]);
+                tmp = squeeze(trapz(dist.r(r0_ind:r1_ind),rtmp.*tmp,3));
             end
             if lcontour
                 contour(dist.energy,dist.pitch,tmp',levels,linestyle,'DisplayName',name)
@@ -537,7 +588,7 @@ for i = 1:size(plot_type,2)
             z = eq.plasma.z;
             phi=eq.plasma.phi;
             tmp = eq.plasma.vt;
-            cstring = 'Toroidal Rotation [cm/s]';            
+            cstring = 'Toroidal Rotation [cm/s]';
         case 'ba'
             plot(ax{i},eq.plasma.r, squeeze(eq.fields.br(:,z0_ind,1)),linestyle, 'DisplayName','B_r');
             plot(ax{i},eq.plasma.r, squeeze(eq.fields.bt(:,z0_ind,1)),linestyle, 'DisplayName','B_t');
@@ -547,17 +598,17 @@ for i = 1:size(plot_type,2)
             legend(ax{i},'Interpreter','none');
         case 'fslice'
             if index==1
-            [~,e_ind]=min(abs(dist.energy-20));
-            [~,p_ind]=min(abs(dist.pitch));
-            phi_ind=1;
-            tmp=squeeze(dist.f(e_ind,p_ind,:,z0_ind,phi_ind));
+                [~,e_ind]=min(abs(dist.energy-20));
+                [~,p_ind]=min(abs(dist.pitch));
+                phi_ind=1;
+                tmp=squeeze(dist.f(e_ind,p_ind,:,z0_ind,phi_ind));
             else
                 [~,e_ind]=min(abs(dist.energy-index(1)));
                 [~,p_ind]=min(abs(dist.pitch-index(2)));
                 [~,z0_ind]=min(abs(dist.z-index(3)));
                 [~,phi_ind]=min(abs(dist.phi-index(4)));
                 tmp=squeeze(dist.f(e_ind,p_ind,:,z0_ind,phi_ind));
-            end             
+            end
             if fac ==1
                 plot(ax{i},dist.r, tmp,linestyle,'DisplayName',['f slice - ' name] );
             else
@@ -572,8 +623,8 @@ for i = 1:size(plot_type,2)
             phi = eq.fields.phi;
             z = dist.z;
             tmp = dist.denf;
-            if index==1      
-                index=z0_ind;   
+            if index==1
+                index=z0_ind;
             end
             if fac == 1
                 plot(ax{i},dist.r, squeeze(tmp(:,index,1)),linestyle, 'DisplayName',['Denf - ' name] );
@@ -602,10 +653,10 @@ for i = 1:size(plot_type,2)
             cstring = 'Fast ion density [cm^{-3}]';
         case 'fdenf2d'
             r = dist.r;
-            phi = eq.fields.phi;
+            phi = dist.phi;
             z = dist.z;
 
-            if index==1
+            if numel(index)==1
                 tmp = squeeze(trapz(dist.pitch,trapz(dist.energy,dist.f,1),2));
             else
 
@@ -651,10 +702,9 @@ for i = 1:size(plot_type,2)
             phi = eq.fields.phi;
             z = dist.z;
 
-            if index==1
+            if numel(index)==1
                 tmp = squeeze(trapz(dist.pitch,trapz(dist.energy,dist.f,1),2));
             else
-
                 [~,e_min]=min(abs(dist.energy-index(1)));
                 [~,e_max]=min(abs(dist.energy-index(2)));
                 [~,p_min]=min(abs(dist.pitch-index(3)));
@@ -665,32 +715,37 @@ for i = 1:size(plot_type,2)
             cstring = 'Fast ion density [m^{-3}]';
         case 'fdenf3d'
             r = dist.r;
-            phi = eq.fields.phi;
+            phi = dist.phi;
             z = dist.z;
 
             if index==1
                 tmp = squeeze(trapz(dist.pitch,trapz(dist.energy,dist.f,1),2));
             else
-
                 [~,e_min]=min(abs(dist.energy-index(1)));
                 [~,e_max]=min(abs(dist.energy-index(2)));
                 [~,p_min]=min(abs(dist.pitch-index(3)));
                 [~,p_max]=min(abs(dist.pitch-index(4)));
                 tmp = squeeze(trapz(dist.pitch(p_min:p_max),trapz(dist.energy(e_min:e_max),dist.f(e_min:e_max,p_min:p_max,:,:,:),1),2));
+                phi=[phi; phi(1)];
+                tmp=cat(3,tmp,tmp(:,:,1));
                 index=index(5);
-            end
-
-            [x_fida,y_fida,z_fida] = meshgrid(dist.r./100+dr/200,dist.z./100+dz/200,mod(dist.phi(2:end-1),2*pi/5)+dphi/2);
-
-            %denf=permute(tmp(:,:,2:end-1),[2 1 3]);
-            %isosurface(x_fida,y_fida,z_fida,denf,index);
-            denf=permute(tmp(:,:,2:end-1),[3 1 2]);
-            isosurface(denf,index);
-            rotate3d on
-            %view(2)
-            %camlight left
+            end 
+            [x_fida,y_fida,z_fida] = ndgrid(r+dr/2,mod(phi,max(phi+dphi/2))+dphi/2,z./1+dz/2);
+            denf=permute(tmp(:,:,:),[1 3 2]);
+            xg = x_fida .* cos(y_fida);
+            yg = x_fida.* sin(y_fida);
+            %Patch around is necessary for RPHIZ-XYZ conversion
+            p=patch(ax{i},isosurface(xg,yg,z_fida,denf,index));
+            colors = parula(20);
+            p.FaceColor = colors(10,:);
+            p.EdgeColor = 'none';
             view(3)
-            camlight left
+            axis equal
+            camlight
+            lighting gouraud
+            xlabel('X')
+            ylabel('Y')
+            zlabel('Z')
             cstring = 'Fast ion density [m^{-3}]';
         case 'brtor'
             r = eq.fields.r;
@@ -832,10 +887,8 @@ for i = 1:size(plot_type,2)
                 if fac~=1.0
                     name = [name,', scale=',num2str(fac)];
                 end
-
                 %cwav_mid=sim_data.cwav_mid(channel);
                 cwav_mid=mean(spec.lambda);%+(spec.lambda(2)-spec.lambda(1));
-
                 disp(['Cwav_mid_fidasim=', num2str(cwav_mid)]);
                 %cwav_mid=sim_data.cwav_mid(channel);
                 %cwav_mid = interp1(1:size(spec.lambda,1),spec.lambda,size(spec.lambda,1)/2.)-(spec.lambda(2)-spec.lambda(1))/2.;
@@ -854,7 +907,7 @@ for i = 1:size(plot_type,2)
                 end
                 %plot(spec.lambda, conv(spec.halo(:,channel),instfu(:,channel),'same'),  'DisplayName',['Halo only - ' name] ); %+spec.brems(:,channel)
                 %plot(spec.lambda, conv(spec.dcx(:,channel),instfu(:,channel),'same'),  'DisplayName',['DCX only - ' name] ); %+spec.brems(:,channel)
-                fprintf('Halo Centered at %.3f nm\n', sum(spec.lambda.*conv(spec.halo(:,channel)+spec.dcx(:,channel),instfu(:,channel),'same'))./sum(conv(spec.halo(:,channel)+spec.dcx(:,channel),instfu(:,channel),'same')));
+                %fprintf('Halo Centered at %.3f nm\n', sum(spec.lambda.*conv(spec.halo(:,channel)+spec.dcx(:,channel),instfu(:,channel),'same'))./sum(conv(spec.halo(:,channel)+spec.dcx(:,channel),instfu(:,channel),'same')));
                 %plot(spec.lambda, conv(spec.fida(:,channel),instfu(:,channel),'same'),  'DisplayName',['FIDA - ' name] );
             else
                 plot(spec.lambda,specr(:,channel),linestyle, 'DisplayName', ['Spectrum - ' name] );
@@ -1009,8 +1062,11 @@ for i = 1:size(plot_type,2)
         end
         if ~isempty(dist)
             if ndims(dist.f) == 5
-                title(ax{i},sprintf('Phi=%.2f',phi(index)))
+                title(ax{i},sprintf('phi=%.2f',dist.phi(index)))
             end
+        end
+        if lsep
+            contour(ax{i},eq.plasma.r*fac,eq.plasma.z*fac,squeeze(eq.plasma.dene(:,:,index))',[1 1],'w-','DisplayName','')
         end
         xlim(ax{i},[r(1)*fac r(end)*fac])
         ylim(ax{i},[z(1)*fac z(end)*fac])
@@ -1021,23 +1077,32 @@ for i = 1:size(plot_type,2)
             xlabel(ax{i},['R [cm] * ', num2str(fac)])
             ylabel(ax{i},['Z [cm] * ', num2str(fac)])
         end
+        axis equal
     elseif strcmp(plot_type{i}(end-2:end),'tor') && ldist
+        if index==1
+            index=z0_ind;
+        end
         if ndims(dist.f) < 5
             disp('4D Distribution has no toroidal information')
             return;
         end
-        imagesc(r,phi,squeeze(tmp(:,z0_ind,:))')
+        if lsep     
+            contour(ax{i},eq.plasma.r*fac,eq.plasma.z*fac,squeeze(eq.plasma.dene(:,index,:))',[1e11 1e11],'w-','DisplayName','')
+        end
+        imagesc(r,phi,squeeze(tmp(:,index,:))')
         xlabel(ax{i},'R [cm]')
         ylabel(ax{i},'Phi [rad]')
+        title(ax{i},sprintf('Z=%.2fcm',dist.z(index)))
         c = colorbar(ax{i});
         c.Label.String = cstring;
         xlim(ax{i},[r(1) r(end)])
     elseif strcmp(plot_type{i}(end-2:end),'tor')
-        pixplot(r,phi,squeeze(tmp(:,z0_ind,:)))
+        pixplot(r,phi,squeeze(tmp(:,index,:)))
         xticks(round(r))
         yticks(round(phi))
         xlabel('R [cm]')
         ylabel('Phi [rad]')
+        title(ax{i},sprintf('Z=%.2fcm',dist.z(index)))
         c = colorbar;
         c.Label.String = cstring;
         xlim([r(1) r(end)])

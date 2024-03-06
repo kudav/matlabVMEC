@@ -176,7 +176,8 @@ for i = 1:size(plot_type,2)
         
         sname = [name, '_', plot_type{i}];
         savefig(gcf,sname)
-        exportgraphics(gcf,[sname,'.eps'],'Resolution',300);
+        exportgraphics(gcf,[sname,'.eps'],'Resolution',600);
+        exportgraphics(gcf,[sname,'.png'],'Resolution',600);
     end
 end
 plot_data.R = R;
