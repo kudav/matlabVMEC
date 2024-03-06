@@ -63,17 +63,28 @@ dZ_F = griddedInterpolant(r,phi,z,dZdphi,'cubic');
     end
 
 
-    function [value,isterminal,direction] = events(t,~)
-        value = mod(t-poinc_loc,maxphi)-pi;
-        isterminal=0;
-        direction=-1;
-    end
-
+    % function [value,isterminal,direction] = events(phi,~)
+    %     value = mod(phi-poinc_loc,maxphi)-pi;
+    %     isterminal=0;
+    %     direction=-1;
+    % end
+% Event function to handle multiple Poincaré sections
+function [value,isterminal,direction] = events(phi,~)
+    value = arrayfun(@(p) mod(phi-p,maxphi)-pi, poinc_loc);
+    isterminal = zeros(size(poinc_loc)); % Do not stop integration
+    direction = -ones(size(poinc_loc)); % Detect crossings in a specific direction
+end
 options = odeset('RelTol',1e-5,'Events',@events);
 starts = reshape(start_loc,1,[]);
-[~,~,phie,ye,~] = ode89(@f,[phi_extent(1) phi_extent(2)],starts,options);
-R_lines=ye(:,1:nstart)';
-Z_lines=ye(:,nstart+1:end)';
-PHI_lines=repmat(phie(:),1,nstart)';
+[~,~,phie,ye,ie] = ode89(@f,[phi_extent(1) phi_extent(2)],starts,options);
+% R_lines=ye(:,1:nstart)';
+% Z_lines=ye(:,nstart+1:end)';
+% PHI_lines=repmat(phie(:),1,nstart)';
+
+% Organizing output for multiple crossings
+R_lines = arrayfun(@(idx) ye(ie == idx,1:nstart)', 1:length(poinc_loc), 'UniformOutput', false);
+Z_lines = arrayfun(@(idx) ye(ie == idx,nstart+1:end)', 1:length(poinc_loc), 'UniformOutput', false);
+PHI_lines = arrayfun(@(idx) repmat(poinc_loc(idx),length(find(ie == idx)),nstart), 1:length(poinc_loc), 'UniformOutput', false);
+
 
 end
