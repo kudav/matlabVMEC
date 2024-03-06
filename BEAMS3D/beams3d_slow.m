@@ -48,6 +48,7 @@ beam_data=[];
 data=[];
 log_type = 'nrl';
 lspecies=0;
+ldex_set=0;
 %NI_AUX_M is in kg, NI_AUX_Z is in ec
 NI_AUX_M = [];
 NI_AUX_Z = [];
@@ -80,6 +81,9 @@ if nargin > 0
                         lspecies=1;
                 case {'nrl','nrl_old','full_init'}
                     log_type = varargin{i};
+                case 'ldex'
+                    i=i+1;
+                    ldex_set= varargin{i};
                 case 'species'
                     lspecies=1;
                     i=i+1;
@@ -143,13 +147,17 @@ else
     vp_spl = pchip(ra,2.*ra.*vmec_data.vp.*vmec_factor);
 end
 
+if ldex_set==0
 % Check to see what type of run it is and extract information
 ldex=1;
 if any(beam_data.neut_lines(1,:) > 0) %NBI run
     ldex=2;
 end
+else 
+    ldex=ldex_set;
+end
 NEUT   = beam_data.neut_lines(ldex,:);
-dex    = and(NEUT == 0,dex);
+dex    = and(~any(NEUT == 1,1),dex);
 R_BEAM = beam_data.R_lines(ldex,dex);
 B_BEAM = beam_data.B_lines(ldex,dex);
 P_BEAM = mod(beam_data.PHI_lines(ldex,dex),max(beam_data.phiaxis));

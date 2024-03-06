@@ -221,6 +221,7 @@ if lplot
         figure
         colors = parula(20);
         for i = 1:20
+            %Patch around is necessary for RPHIZ-XYZ conversion
             p = patch(isosurface(xg,yg,zg,fluxphi,i/20*max(fluxphi(sarr<1),[],'all')));
             %isonormals(xg,yg,zg,fluxphi,p)
             p.FaceColor = colors(i,:);
