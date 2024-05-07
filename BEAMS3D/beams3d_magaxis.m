@@ -20,7 +20,7 @@ zaxis=zeros(1,beam_data.nphi);
 % Make 2D
 for i=1:beam_data.nphi-1
     S2D = squeeze(beam_data.S_ARR(:,i,:));
-    smin = min(min(S2D));
+    smin = double(min(min(S2D)));
     [row,col] = find(S2D==smin);
     raxis(i) = beam_data.raxis(row);
     zaxis(i) = beam_data.zaxis(col); 
