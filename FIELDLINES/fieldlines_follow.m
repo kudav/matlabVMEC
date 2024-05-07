@@ -31,7 +31,7 @@ if numel(grid_extent)==0
     grid_extent(1)=in_data.raxis(1);
     grid_extent(2)=in_data.raxis(end);
     grid_extent(3)=in_data.zaxis(1);
-    grid_extent(4)=in_data.raxis(end);
+    grid_extent(4)=in_data.zaxis(end);
 end
 maxphi=max(in_data.phiaxis);
 if ~strcmp(in_data.datatype,'FIELDLINES')
@@ -68,9 +68,9 @@ dZ_F = griddedInterpolant(r,phi,z,dZdphi,'cubic');
     %     isterminal=0;
     %     direction=-1;
     % end
-% Event function to handle multiple Poincaré sections
+% Event function to handle multiple Poincar sections
 function [value,isterminal,direction] = events(phi,~)
-    value = arrayfun(@(p) mod(phi-p,maxphi)-pi, poinc_loc);
+    value = arrayfun(@(p) mod(phi-p,maxphi), poinc_loc);
     isterminal = zeros(size(poinc_loc)); % Do not stop integration
     direction = -ones(size(poinc_loc)); % Detect crossings in a specific direction
 end
