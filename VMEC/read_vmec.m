@@ -72,7 +72,7 @@ else
     length=size(line,2);
     version=str2double(strtrim(line(index:length)));
     % Handle unknown versions
-    if (version < 0) || (version > 8.52)
+    if (version < 0) || (version > 10.0)
         disp('Unknown file type or version.');
         f=2;
         return
@@ -107,7 +107,7 @@ elseif (version <= 6.95) && ~netcdffile
     f=read_vmec_695(fid,fmt);
 elseif (version <= 8.00) && ~netcdffile
     f=read_vmec_800(fid,fmt);
-elseif (version <= 8.52) && ~netcdffile
+elseif (version > 8.00) && ~netcdffile
     f=read_vmec_847(fid,fmt);
 elseif netcdffile
     f=read_vmec_netcdf(filename);
