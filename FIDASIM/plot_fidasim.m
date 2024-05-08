@@ -28,6 +28,8 @@ function [ ax, n_fida ] = plot_fidasim(file,varargin)
 %      plot_fidasim(runid,'q2d'); %Approx. of safety factor
 %      plot_fidasim(runid,'ndensvert'); %Neutral density, vertical
 %      plot_fidasim(runid,'ndenshorz'); %Neutral density, horizontal
+%      plot_fidasim(runid,'weights',[lamda,channel_num); %FIDA weights
+%      plot_fidasim(runid,'weights'); %FIDA weights
 %      plot_fidasim(runid,'ax', ax); %Figure handles for sharing plots
 %
 % Miscellaneous Arguments
@@ -48,7 +50,7 @@ function [ ax, n_fida ] = plot_fidasim(file,varargin)
 
 ec=1.6021773300E-19; % Charge of an electron (leave alone)
 
-if isstr(file)
+if ischar(file)
     if (strcmp(file(end-1:end),'h5'))
         disp('ERROR: Only give runid (dist and eq files are loaded automatically!');
         disp(['       Filename: ' file]);
@@ -97,7 +99,9 @@ else
     if isfield(file,'weight')
         weight=file.weight;
     end
-
+    if isfield(file,'spec')
+        spec=file.spec;
+    end    
     if isfield(file,'birth')
         birth=file.birth;
     end
@@ -129,6 +133,7 @@ lbirth=0;
 lcontour=0;
 levels=2;
 linput=0;
+lintersection=0;
 n_fida=-1;
 sim_data = {};
 channel = 0;
@@ -244,6 +249,9 @@ if nargin > 1
             case 'sim_data'
                 i=i+1;
                 sim_data = varargin{i};
+            case 'intersection'
+                lintersection=1;
+                lgeom=1;
             case 'save'
                 lsave = 1;
             case 'passive'
@@ -339,7 +347,6 @@ if ~lloaded
             disp(['       Filename: ' file]);
         end
         %[~,I] = sort(spec.radius);
-
     end
     if lgeom
         geom = read_hdf5(geom_name);
@@ -667,6 +674,7 @@ for i = 1:size(plot_type,2)
                 tmp = squeeze(trapz(dist.pitch(p_min:p_max),trapz(dist.energy(e_min:e_max),dist.f(e_min:e_max,p_min:p_max,:,:,:),1),2));
                 index=index(5);
             end
+
             cstring = 'Fast ion density [cm^{-3}]';
         case 'br2d'
             r = eq.fields.r;
@@ -946,10 +954,14 @@ for i = 1:size(plot_type,2)
             los_nbi = reshape(los_nbi,3,2);
             plot3(ax{i},squeeze(los_nbi(1,:))'*fac,squeeze(los_nbi(2,:))'*fac,squeeze(los_nbi(3,:))'*fac,'-r');
             plot3(ax{i},squeeze(los_nbi(1,1))'*fac,squeeze(los_nbi(2,1))'*fac,squeeze(los_nbi(3,1))'*fac,'+k');
+            plot3(ax{i},[0, 1000*cos(1.8)]*fac,[0, 1000*sin(1.8)]*fac,[0,0],'g');
+            intersections = calculateIntersections(geom.spec.lens, geom.spec.axis, 1.8);
+            plot3(ax{i},intersections(1,:),intersections(2,:),intersections(3,:),'k.');
             sname = [file, '_', plot_type{i}];
             xlabel('X [cm]')
             ylabel('Y [cm]')
             zlabel('Z [cm]')
+            grid on
             %writematrix(los_nbi,sname,linestyle);
             % set(h, {'DisplayName'}, cellstr(deblank(geom.spec.id(channel))))
             %legend(h,'Location','bestoutside');
@@ -1068,6 +1080,10 @@ for i = 1:size(plot_type,2)
         if lsep
             contour(ax{i},eq.plasma.r*fac,eq.plasma.z*fac,squeeze(eq.plasma.dene(:,:,index))',[1 1],'w-','DisplayName','')
         end
+        if lintersection
+            intersections = calculateIntersections(geom.spec.lens, geom.spec.axis, dist.phi(index));
+            plot(ax{i},intersections(1,:),intersections(2,:),'k.');
+        end
         xlim(ax{i},[r(1)*fac r(end)*fac])
         ylim(ax{i},[z(1)*fac z(end)*fac])
         if fac==1
@@ -1150,3 +1166,24 @@ R(1,3)= -sb   ; R(2,3) = cb*sg            ; R(3,3)= cb*cg;
 uvw_shifted = uvw-repmat(origin,size(uvw,1),1);
 xyz = uvw_shifted*R;
 end
+
+function intersections = calculateIntersections(lens, axis, phi)
+    % numLines = size(lens, 2);
+    % intersections = zeros(3,numLines); % Prepare for (x, y, z) points
+    % % X value for all intersections based on fixed phi
+    % x_fixed = radius' .* cos(phi);
+    
+        t = (tan(phi).*lens(1,:)-lens(2,:))./(axis(2,:)-axis(1,:).*tan(phi));
+        intersections = lens + t .* axis;    
+    % for i = 1:numLines
+    %     t = (x_fixed - lens(1, i)) / axis(1, i);
+    %     intersections(:, i) = lens(:, i) + t(i) .* axis(:, i);
+    % end
+     intersections(1,:)=sqrt(intersections(1,:).^2+intersections(2,:).^2);
+    intersections=intersections([1,3],:); %Only R,Z coordinates
+    % Filter out any intersections that do not make physical sense, e.g., if t < 0
+    intersections = intersections(:,t >= 0);
+    
+    return;
+end
+
