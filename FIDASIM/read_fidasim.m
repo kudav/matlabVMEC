@@ -11,6 +11,20 @@ end
 nml_name=[runid,'_inputs.dat'];
 if isfile(nml_name)
     input=read_namelist(nml_name,'fidasim_inputs');
+    % Get all field names in the structure
+    fields = fieldnames(input);
+    
+    % Loop through each field
+    for i = 1:numel(fields)
+        % Get the current field's value
+        currentValue = input.(fields{i});
+        
+        % Check if the field contains a character array
+        if ischar(currentValue)
+            % Replace the old substring with the new one
+            input.(fields{i}) = strrep(currentValue, '%%FIDASIM_PATH%%NUMBER', runid(1:2));
+        end
+    end
     dist_name=splitfn(input.distribution_file);
     eq_name=splitfn(input.equilibrium_file);
     geom_name=splitfn(input.geometry_file);

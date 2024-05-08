@@ -8,36 +8,45 @@ function [ ax, n_fida ] = plot_fidasim(file,varargin)
 %across codes. For plotting FIDA/BES profiles, see plot_fidasim_profiles.
 %
 % Example usage
-%      plot_fidasim(runid);
-%      plot_fidasim(runid,'overview'); %NOT IMPLEMENTED
-%      plot_fidasim(runid,'profiles'); %Kinetic profiles
-%      plot_fidasim(runid,'ba'); %All magnetic field components on midplane
-%      plot_fidasim(runid,'bx_'); %Magnetic field on RZ plane (x=r,p,z)
-%      plot_fidasim(runid,'bx_'); %Magnetic field on midplane (x=r,p,z)
-%      plot_fidasim(runid,'spectrum', channel_no); %Spectral components
-%      plot_fidasim(runid,'fslice'); %Outboard midplane profile of dist.(f)
-%      plot_fidasim(runid,'denf_'); %FI density on RZ plane from denf
-%      plot_fidasim(runid,'fdenf_'); %FI density on RZ plane from f
-%      plot_fidasim(runid,'energy'); %Energy dist, int. over real space
-%      plot_fidasim(runid,'pitch'); %Pitch dist, int. over real space
-%      plot_fidasim(runid,'ep2d'); %E-p dist.,  int. over real space
-%      !!! '_' can be '2d' (RZ plane) or 'tor' (midplane)
-%      plot_fidasim(runid,'ep2d',[R PHI Z]); %E-p dist., at spatial point
-%      plot_fidasim(runid,'ep2d',[R1 R2 P1 P2 Z1 Z2]); %E-p int over
-%       spatial range
-%      plot_fidasim(runid,'q2d'); %Approx. of safety factor
-%      plot_fidasim(runid,'ndensvert'); %Neutral density, vertical
-%      plot_fidasim(runid,'ndenshorz'); %Neutral density, horizontal
-%      plot_fidasim(runid,'weights',[lamda,channel_num); %FIDA weights
-%      plot_fidasim(runid,'weights'); %FIDA weights
-%      plot_fidasim(runid,'ax', ax); %Figure handles for sharing plots
+%      plot_fidasim(f); %f can be id or struct from read_fidasim
+%      plot_fidasim(f,'overview'); %NOT IMPLEMENTED
+%      plot_fidasim(f,'profiles'); %Kinetic profiles
+%      plot_fidasim(f,'spectrum', channel_no); %Spectral components
+%      plot_fidasim(f,'fslice'); %Outboard midplane profile of dist.(f)
+%      plot_fidasim(f,'ba'); %All magnetic field components on midplane
+%      plot_fidasim(f,'bx_'); %Magnetic field (x=r,p,z)
+%      plot_fidasim(f,'denf_'); %FI density on RZ plane from denf
+%      plot_fidasim(f,'fdenf_'); %FI density on RZ plane from f
+%       optionally followed by index for toroidal/vertical position    
+%       '_' can be:     none: profile@midplane, index for tor. pos
+%                       '2d': R-Z plane
+%                           'torint' calculates toroidal integral
+%                           'intersection' calculates LOS positions
+%                           'sep' shows approx. separatrix pos.
+%                       'tor': midplane (R-PHI)
+%       
+%      plot_fidasim(f,'energy'); %Energy dist, int. over real space
+%      plot_fidasim(f,'pitch'); %Pitch dist, int. over real space
+%      plot_fidasim(f,'ep2d'); %E-p dist.,  int. over real space
+%      plot_fidasim(f,'ep2d',[R PHI Z]); %E-p dist., at spatial point
+%      plot_fidasim(f,'ep2d',[R1 R2 P1 P2 Z1 Z2]); %E-p int over
+%                               spatial range
+%      plot_fidasim(f,'bmir'); %Mirror field dist. (broken)
+%      plot_fidasim(f,'q2d'); %Approx. of safety factor
+%      plot_fidasim(f,'ndensvert'); %Neutral density, vertical
+%      plot_fidasim(f,'ndenshorz'); %Neutral density, horizontal
+%      plot_fidasim(f,'weights',[lamda,channel_num); %FIDA weights
+%      plot_fidasim(f,'weights'); %FIDA weights
+%      plot_fidasim(f,'ax', ax); %Figure handles for sharing plots
 %
 % Miscellaneous Arguments
-%      plot_fidasim(runid,'mean'); %Apply moving mean to spectrum
-%      plot_fidasim(runid,'sim_data',sim_data); %Used for dispersion
-%      plot_fidasim(runid,'save'); %Export figures (.fig and .png)
-%      plot_fidasim(runid,'name', 'test'); %ID Name for legend
-%      plot_fidasim(runid,'fac', 1.0); %Scaling factor
+%      plot_fidasim(f,'mean'); %Apply moving mean to spectrum
+%      plot_fidasim(f,'contour', levels); %Show area as contour plot 
+%      plot_fidasim(f,'style', linestyle); %Define linestyle
+%      plot_fidasim(f,'sim_data',sim_data); %Used for dispersion
+%      plot_fidasim(f,'save'); %Export figures (.fig and .png)
+%      plot_fidasim(f,'name', 'test'); %ID Name for legend
+%      plot_fidasim(f,'fac', 1.0); %Scaling factor
 %
 % Example usage of comparing BEAMS3D and TRANSP results:
 %     filename_b3d = fidasim_b3d
@@ -133,6 +142,7 @@ lbirth=0;
 lcontour=0;
 levels=2;
 linput=0;
+ltorint=0;
 lintersection=0;
 n_fida=-1;
 sim_data = {};
@@ -150,7 +160,7 @@ if nargin > 1
     i = 1;
     while i < nargin
         switch varargin{i}
-            case {'overview','profiles',...
+            case {'overview','profiles','profiles_rho',...
                     'ba','br2d','bt2d','bz2d',...
                     'brtor','bttor','bztor','q2d',...
                     'te2d','ne2d','ti2d', 'vt2d'}
@@ -258,6 +268,8 @@ if nargin > 1
                 lpassive=1;
             case 'brems'
                 lbrems=1;
+            case 'torint'
+                ltorint=1;
             case 'ax'
                 i=i+1;
                 ax = varargin{i};
@@ -470,13 +482,13 @@ for i = 1:size(plot_type,2)
             xlabel('Pitch [-]')
             ylabel('Fast Ion Distribution [-]')
         case 'bmir'
-            if ndims(dist.f) == 5
-                tmp = squeeze(trapz(dphi*nphi/(nphi-1),trapz(dz*nz/(nz-1),trapz(dist.energy,dist.f,1),4),5));
-                tmp = squeeze(trapz(dr*nr/(nr-1),repmat(dist.r',size(dist.f,2),1).*tmp,2));
-            else
-                tmp = squeeze(trapz(dz*nz/(nz-1),trapz(dist.energy,dist.f,1),4))*2*pi;
-                tmp = squeeze(trapz(dr*nr/(nr-1),repmat(dist.r',size(dist.f,2),1).*tmp,2));
-            end
+            % if ndims(dist.f) == 5
+            %     tmp = squeeze(trapz(dphi*nphi/(nphi-1),trapz(dz*nz/(nz-1),trapz(dist.energy,dist.f,1),4),5));
+            %     tmp = squeeze(trapz(dr*nr/(nr-1),repmat(dist.r',size(dist.f,2),1).*tmp,2));
+            % else
+            %     tmp = squeeze(trapz(dz*nz/(nz-1),trapz(dist.energy,dist.f,1),4))*2*pi;
+            %     tmp = squeeze(trapz(dr*nr/(nr-1),repmat(dist.r',size(dist.f,2),1).*tmp,2));
+            % end
             tmp=trapz(dist.energy,dist.f,1);
             modb=sqrt(eq.fields.br.^2+eq.fields.bt.^2+eq.fields.bz.^2);
             i = floor(dist.nr/2);
@@ -572,6 +584,18 @@ for i = 1:size(plot_type,2)
             plot(ax{i},eq.plasma.r, squeeze(eq.plasma.dene(:,z0_ind,1)), 'DisplayName',['n_e - ' name] );
             xlabel(ax{i},'R [cm]')
             ylabel(ax{i},'n_e [cm^{-3}]')
+        case 'profiles_rho'
+            yyaxis(ax{i},'left')
+            plot(ax{i},eq.plasma.profiles.rho, eq.plasma.profiles.te, 'DisplayName',['T_e - ' name] );
+            hold on
+            plot(ax{i},eq.plasma.profiles.rho, eq.plasma.profiles.ti, 'DisplayName',['T_i - ' name] );
+            plot(ax{i},eq.plasma.profiles.rho, eq.plasma.profiles.zeff, 'DisplayName',['Zeff [-] - ' name] );
+            ylabel(ax{i},'T [keV]')
+            legend(ax{i},'Interpreter','none');
+            yyaxis(ax{i},'right')
+            plot(ax{i},eq.plasma.profiles.rho, eq.plasma.profiles.dene, 'DisplayName',['n_e - ' name] );
+            xlabel(ax{i},'rho [-]')
+            ylabel(ax{i},'n_e [cm^{-3}]')            
         case 'ne2d'
             r = eq.plasma.r;
             z = eq.plasma.z;
@@ -634,7 +658,7 @@ for i = 1:size(plot_type,2)
                 index=z0_ind;
             end
             if fac == 1
-                plot(ax{i},dist.r, squeeze(tmp(:,index,1)),linestyle, 'DisplayName',['Denf - ' name] );
+                plot(ax{i},dist.r, squeeze(tmp(:,index,1)),linestyle, 'DisplayName',sprintf('%s, z= %.2f',name,dist.z(z0_ind)));
             else
                 plot(ax{i},dist.r, fac*squeeze(tmp(:,index,1)),linestyle, 'DisplayName',['Denf - ' name ', scaling factor: ' num2str(fac)]);
             end
@@ -642,7 +666,17 @@ for i = 1:size(plot_type,2)
             ylabel('Fast ion density [cm^{-3}]')
             %title(sprintf('FI density profile at z= %.2f',dist.z(z0_ind)))
         case 'fdenf'
-            tmp = squeeze(trapz(dist.pitch,trapz(dist.energy,dist.f,1),2));
+            if numel(index)==1
+                tmp = squeeze(trapz(dist.pitch,trapz(dist.energy,dist.f,1),2));
+            else
+
+                [~,e_min]=min(abs(dist.energy-index(1)));
+                [~,e_max]=min(abs(dist.energy-index(2)));
+                [~,p_min]=min(abs(dist.pitch-index(3)));
+                [~,p_max]=min(abs(dist.pitch-index(4)));
+                tmp = squeeze(trapz(dist.pitch(p_min:p_max),trapz(dist.energy(e_min:e_max),dist.f(e_min:e_max,p_min:p_max,:,:,:),1),2));
+                index=index(5);
+            end
             if fac == 1
                 plot(ax{i},dist.r, tmp(:,z0_ind,index),linestyle, 'DisplayName',['Denf from f - ' name] );
                 %plot(ax{i},dist.r, movmean(tmp(:,z0_ind,1),15),linestyle, 'DisplayName',['Movmean Denf from f - ' name] );
@@ -656,7 +690,7 @@ for i = 1:size(plot_type,2)
             r = dist.r;
             z = dist.z;
             phi=dist.phi;
-            tmp = dist.denf;
+            tmp = dist.denf;%.*dist.r2d;
             cstring = 'Fast ion density [cm^{-3}]';
         case 'fdenf2d'
             r = dist.r;
@@ -954,10 +988,10 @@ for i = 1:size(plot_type,2)
             los_nbi = reshape(los_nbi,3,2);
             plot3(ax{i},squeeze(los_nbi(1,:))'*fac,squeeze(los_nbi(2,:))'*fac,squeeze(los_nbi(3,:))'*fac,'-r');
             plot3(ax{i},squeeze(los_nbi(1,1))'*fac,squeeze(los_nbi(2,1))'*fac,squeeze(los_nbi(3,1))'*fac,'+k');
-            plot3(ax{i},[0, 1000*cos(1.8)]*fac,[0, 1000*sin(1.8)]*fac,[0,0],'g');
-            intersections = calculateIntersections(geom.spec.lens, geom.spec.axis, 1.8);
-            plot3(ax{i},intersections(1,:),intersections(2,:),intersections(3,:),'k.');
-            sname = [file, '_', plot_type{i}];
+            plot3(ax{i},[0, 1000*cos(5.8)]*fac,[0, 1000*sin(5.8)]*fac,[0,0],'g');
+            %intersections = calculateIntersections(geom.spec.lens, geom.spec.axis, 1.8);
+            %plot3(ax{i},intersections(1,:),intersections(2,:),intersections(3,:),'k.');
+            %sname = [file, '_', plot_type{i}];
             xlabel('X [cm]')
             ylabel('Y [cm]')
             zlabel('Z [cm]')
@@ -1065,6 +1099,11 @@ for i = 1:size(plot_type,2)
     %disp(plot_type{i});
     %if numel(plot_type{i}) > 2
     if strcmp(plot_type{i}(end-1:end),'2d')
+        if ltorint
+            tmp = trapz(dphi*nphi/(nphi-1),dist.r2d.*tmp,3);
+            index=1;
+            cstring(end-2)='2';%Denote area density
+        end
         if lcontour
             contour(ax{i},r*fac,z*fac,squeeze(tmp(:,:,index))',levels,linestyle,'DisplayName',name)
         else
@@ -1072,7 +1111,7 @@ for i = 1:size(plot_type,2)
             c = colorbar(ax{i});
             c.Label.String = cstring;
         end
-        if ~isempty(dist)
+        if ~isempty(dist) &&~ltorint
             if ndims(dist.f) == 5
                 title(ax{i},sprintf('phi=%.2f',dist.phi(index)))
             end
