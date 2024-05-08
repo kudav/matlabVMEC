@@ -219,7 +219,7 @@ if nargin > 1
                 channel = varargin{i};
             case{'los3d', 'lostor','los2d'}
                 plot_type{end+1}=varargin{i}; %Make multiple plots possible
-                lspec = 1;
+                %lspec = 1;
                 lgeom = 1;
                 i=i+1;
                 channel = varargin{i};
