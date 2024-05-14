@@ -406,7 +406,6 @@ elseif iscell(channel)
         end
         channel = channel_tmp;
     end
-
 end
 
 for i = 1:size(plot_type,2)
@@ -1120,7 +1119,11 @@ for i = 1:size(plot_type,2)
             contour(ax{i},eq.plasma.r*fac,eq.plasma.z*fac,squeeze(eq.plasma.dene(:,:,index))',[1 1],'w-','DisplayName','')
         end
         if lintersection
+            if channel==0
             intersections = calculateIntersections(geom.spec.lens, geom.spec.axis, dist.phi(index));
+            else
+                intersections = calculateIntersections(geom.spec.lens(:,channel), geom.spec.axis(:,channel), dist.phi(index));
+            end
             plot(ax{i},intersections(1,:),intersections(2,:),'k.');
         end
         xlim(ax{i},[r(1)*fac r(end)*fac])
