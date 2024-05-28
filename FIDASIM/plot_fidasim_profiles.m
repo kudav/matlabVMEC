@@ -90,7 +90,6 @@ end
 spec_name = [filename,'_spectra.h5'];
 geom_name = [filename,'_geometry.h5'];
 
-
 if ~isfile(geom_name)|| lload_fidasim
     fida_data=read_fidasim(filename,'geom','spec');
     data=fida_data.spec;
@@ -116,7 +115,7 @@ else
     pfida=zeros(size(fida));
 end
 
-spec = full + half + third + halo + dcx + fida+pfida;% + brems;
+spec = full + half + third + halo + dcx + fida + pfida;% + brems;
 
 
 
@@ -141,7 +140,7 @@ end
 
 
 cwav_mid=mean(lambda);
-
+if ~lload_fidasim
 instfu = box_gauss_funct(lambda,0.,1.,cwav_mid,in_data.instfu_gamma,in_data.instfu_box_nm);
 disp(['Applying Instrument function to FIDASIM data: ', filename]);
 if numel(in_data.instfu_gamma)==numel(in_data.names)
@@ -150,7 +149,7 @@ end
 for i = 1:size(instfu,2)
     spec(:,i) = conv(spec(:,i),instfu(:,i),'same');    
 end
-
+end
 if lmean == 1
     spec = movmean(spec,15);
     disp(['Applying moving mean to FIDASIM data: ', filename]);
@@ -161,21 +160,17 @@ dispersion_tmp = diff(lambda,1);
 dispersion_tmp = [dispersion_tmp; dispersion_tmp(end,:)];
 dispersion_tmp = repmat(dispersion_tmp,1,size(spec,2));
 
-% bes_dex = (lambda_dat > repmat(bes_range(:,1)',size(lambda_dat,1),1)) & (lambda_dat < repmat(bes_range(:,2)',size(lambda_dat,1),1));
-% fida_dex = (lambda_dat > fida_range(1)) & (lambda_dat < fida_range(2));
 bg_dex = (lambda > bg_range(1)) & (lambda < bg_range(2));
-bes_dex = (lambda > repmat(bes_range(:,1)',size(lambda,1),1)) & (lambda < repmat(bes_range(:,2)',size(lambda,1),1));
-fida_dex = (lambda > fida_range(1)) & (lambda < fida_range(2));
-
-% for i = 1:size(lambda_dat,2)
-% dispersion_tmp(:,i) = interp1(lambda_dat(:,i),dispersion(:,i),lambda);
-% end
-%
-% bes = sum(spec.*dispersion_tmp.*bes_dex,1);
-% fida = sum(spec.*dispersion_tmp.*fida_dex,1);
-
 bg = sum(brems.*dispersion_tmp.*bg_dex,1,'omitnan')./sum(dispersion_tmp.*bg_dex,1,'omitnan');
-bes = sum(spec(:,1:size(bes_dex,2)).*dispersion_tmp(:,1:size(bes_dex,2)).*bes_dex,1,'omitnan');
+
+if size(bes_range,1)==numel(bg)&&~lload_fidasim
+bes_dex = (lambda > repmat(bes_range(:,1)',size(lambda,1),1)) & (lambda < repmat(bes_range(:,2)',size(lambda,1),1));
+bes = sum(spec.*dispersion_tmp.*bes_dex,1,'omitnan');
+else
+    bes = sum(full.*dispersion_tmp,1,'omitnan')/3;%Approximate BES by full Beam component
+end
+
+fida_dex = (lambda > fida_range(1)) & (lambda < fida_range(2));
 fida = sum(spec.*dispersion_tmp.*fida_dex,1,'omitnan');
 
 for i = 1:size(plot_type,2)
@@ -198,9 +193,9 @@ for i = 1:size(plot_type,2)
         case 'fidabes'
             tmp = fida(dex)./bes(dex);
             ystr = 'FIDA/BES';
-            if lsave
-                legend(ax{i},'Location','southwest');
-            end
+            % if lsave
+            %     legend(ax{i},'Location','southwest');
+            % end
 
     end
 
@@ -214,7 +209,6 @@ for i = 1:size(plot_type,2)
     xlabel(ax{i},'R [cm]')
     ylabel(ax{i},ystr)
     if lsave
-        
         sname = [name, '_', plot_type{i}];
         savefig(gcf,[sname,'.fig']);
         exportgraphics(gcf,[sname,'.eps'],'Resolution',600);

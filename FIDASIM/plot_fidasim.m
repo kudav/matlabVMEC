@@ -27,15 +27,15 @@ function [ ax, n_fida ] = plot_fidasim(file,varargin)
 %       
 %      plot_fidasim(f,'energy'); %Energy dist, int. over real space
 %      plot_fidasim(f,'pitch'); %Pitch dist, int. over real space
-%      plot_fidasim(f,'ep2d'); %E-p dist.,  int. over real space
-%      plot_fidasim(f,'ep2d',[R PHI Z]); %E-p dist., at spatial point
-%      plot_fidasim(f,'ep2d',[R1 R2 P1 P2 Z1 Z2]); %E-p int over
+%      plot_fidasim(f,'epplot'); %E-p dist.,  int. over real space
+%      plot_fidasim(f,'epplot',[R PHI Z]); %E-p dist., at spatial point
+%      plot_fidasim(f,'epplot',[R1 R2 P1 P2 Z1 Z2]); %E-p int over
 %                               spatial range
 %      plot_fidasim(f,'bmir'); %Mirror field dist. (broken)
 %      plot_fidasim(f,'q2d'); %Approx. of safety factor
 %      plot_fidasim(f,'ndensvert'); %Neutral density, vertical
 %      plot_fidasim(f,'ndenshorz'); %Neutral density, horizontal
-%      plot_fidasim(f,'weights',[lamda,channel_num); %FIDA weights
+%      plot_fidasim(f,'weights',[lamda,channel_num]); %FIDA weights
 %      plot_fidasim(f,'weights'); %FIDA weights
 %      plot_fidasim(f,'ax', ax); %Figure handles for sharing plots
 %
@@ -153,6 +153,8 @@ index=1;
 rotation=0;
 lpassive=0;
 lbrems=0;
+llegend=0;
+leps=0;
 lsep=0;
 tmp=[];
 tmp2=[];
@@ -172,9 +174,12 @@ if nargin > 1
                         index = varargin{i};
                     end
                 end
+            case {'ep2d'}
+                varargin{i}='epplot';
+                i=i-1;
             case {'fslice','denf2d','denf','denftor',...
                     'fdenf','fdenf2d','fdenftor','fdenf3d',...
-                    'pitch','energy','ep2d',...
+                    'pitch','energy','epplot',...
                     'bmir'}
                 plot_type{end+1}=varargin{i}; %Make multiple plots possible
                 ldist = 1;
@@ -250,6 +255,12 @@ if nargin > 1
             case {'birth_R','birth_Z','birth_pitch', 'birth_phi'}
                 lbirth = 1;
                 plot_type{end+1}=varargin{i}; %Make multiple plots possible
+            case 'channel'
+                channel=varargin{i};
+            case 'eps'
+                leps = 1;                     
+            case 'legend'
+                llegend = 1;                
             case 'mean'
                 lmean = 1;
             case {'contour','contours'}
@@ -377,6 +388,8 @@ if ~lloaded
             lgeom=0;
         end
     end
+else
+    [~,z0_ind]=min(abs(eq.fields.z));
 end
 
 if ischar(channel)
@@ -511,7 +524,7 @@ for i = 1:size(plot_type,2)
             minb=min(modb(:,:,index),[],'all');
             yline([-minb minb])
             yline([-modb(floor(dist.nr/2),floor(dist.nz/2),1) modb(floor(dist.nr/2),floor(dist.nz/2),1)])
-        case 'ep2d'
+        case 'epplot'
             if index==1
                 if ndims(dist.f) == 5
                     tmp = squeeze(trapz(dist.phi,trapz(dist.z,dist.f,4),5));
@@ -556,6 +569,12 @@ for i = 1:size(plot_type,2)
             else
                 imagesc(dist.energy,dist.pitch,tmp')
             end
+            if lweight
+            [~,index(1)]=min(abs(weight.lambda-660));%wvl
+            index(2) = channel;
+            tmp=squeeze(weight.weight(index(1),:,:,index(2)));
+                contour(ax{i},weight.energy,weight.pitch,tmp',levels,linestyle,'DisplayName',name)
+            end        
             cstring='Fast Ion Distribution [1/keV]';
             c = colorbar;
             c.Label.String = cstring;
@@ -563,14 +582,14 @@ for i = 1:size(plot_type,2)
             xlabel('Energy [keV]')
             xlim([dist.energy(1) dist.energy(end)])
             ylim([dist.pitch(1) dist.pitch(end)])
-            if lsave
-                legend(ax{i},'Interpreter','none');
-                sname = [file, '_', name,'_', plot_type{i} ,'.fig'];
-                savefig(ax{i}.Parent,sname)
-                %exportgraphics(ax{i}.Parent,[sname,'.eps'],'Resolution',300);
-                exportgraphics(ax{i}.Parent,[sname,'.png'],'Resolution',600);
-            end
-            return
+            % if lsave
+            %     legend(ax{i},'Interpreter','none');
+            %     sname = [file, '_', name,'_', plot_type{i} ,'.fig'];
+            %     savefig(ax{i}.Parent,sname)
+            %     %exportgraphics(ax{i}.Parent,[sname,'.eps'],'Resolution',300);
+            %     exportgraphics(ax{i}.Parent,[sname,'.png'],'Resolution',600);
+            % end
+            %return
         case 'profiles'
             yyaxis(ax{i},'left')
             plot(ax{i},eq.plasma.r, squeeze(eq.plasma.te(:,z0_ind,1)), 'DisplayName',['T_e - ' name] );
@@ -626,6 +645,7 @@ for i = 1:size(plot_type,2)
             xlabel(ax{i},'R [cm]')
             ylabel(ax{i},'Magnetic Field [T]')
             legend(ax{i},'Interpreter','none');
+            return;
         case 'fslice'
             if index==1
                 [~,e_ind]=min(abs(dist.energy-20));
@@ -896,7 +916,7 @@ for i = 1:size(plot_type,2)
             end
             if ~isempty(tmp2)
                 currentLimits=clim;
-                contour(ax{i},weight.energy,weight.pitch,tmp2',5,linestyle,'LineColor','k','DisplayName','FI Dist.')
+                contour(ax{i},weight.energy,weight.pitch,tmp2',5,linestyle,'LineColor','w','DisplayName','FI Dist.')
                 clim(currentLimits);
             end
             c = colorbar(ax{i});
@@ -937,9 +957,9 @@ for i = 1:size(plot_type,2)
                 plot(spec.lambda,conv(specr(:,channel),instfu(:,channel),'same'), 'DisplayName', ['Spectrum - ' name] );
                 %plot(spec.lambda,specr(:,channel), 'DisplayName', ['Spectrum no instfu - ' name] );
                 %plot(spec.lambda,specr(:,channel), 'DisplayName', ['Spectrum - ' name] );
-                % plot(spec.lambda, conv(spec.full(:,channel),instfu(:,channel),'same'), 'DisplayName',['Full - ' name] );
-                % plot(spec.lambda, conv(spec.half(:,channel),instfu(:,channel),'same'),  'DisplayName',['Half - ' name] );
-                %plot(spec.lambda, conv(spec.third(:,channel),instfu(:,channel),'same'),  'DisplayName',['Third - ' name] );
+                plot(spec.lambda, conv(spec.full(:,channel),instfu(:,channel),'same'), 'DisplayName',['Full - ' name] );
+                plot(spec.lambda, conv(spec.half(:,channel),instfu(:,channel),'same'),  'DisplayName',['Half - ' name] );
+                plot(spec.lambda, conv(spec.third(:,channel),instfu(:,channel),'same'),  'DisplayName',['Third - ' name] );
                 if ( isfield(spec,'pfida') && lpassive)
                     plot(spec.lambda, conv(spec.pfida(:,channel),instfu(:,channel),'same'),  'DisplayName',['Passive FIDA - ' name] );
                 end
@@ -1166,12 +1186,16 @@ for i = 1:size(plot_type,2)
         xlim([r(1) r(end)])
     end
     if lsave
+        if llegend
         legend(ax{i},'Interpreter','none');
+        end
         sname = [file, '_', name,  '_', plot_type{i}];
         savefig(ax{i}.Parent,[sname,'.fig'])
         set(ax{i}.Parent, 'Renderer', 'painters');
         set(ax{i}, 'Color', 'none');
-        %exportgraphics(ax{i}.Parent,[sname,'.eps'],'Resolution',300,'BackgroundColor','none');
+        if leps
+            exportgraphics(ax{i}.Parent,[sname,'.eps'],'Resolution',300,'BackgroundColor','none');
+        end
         exportgraphics(ax{i}.Parent,[sname,'.png'],'Resolution',600);
     end
 
