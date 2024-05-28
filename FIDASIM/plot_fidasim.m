@@ -1141,10 +1141,10 @@ for i = 1:size(plot_type,2)
             disp('4D Distribution has no toroidal information')
             return;
         end
-        if lsep     
-            contour(ax{i},eq.plasma.r*fac,eq.plasma.z*fac,squeeze(eq.plasma.dene(:,index,:))',[1e11 1e11],'w-','DisplayName','')
-        end
         imagesc(r,phi,squeeze(tmp(:,index,:))')
+        if lsep     
+            contour(ax{i},eq.plasma.r*fac,eq.plasma.phi*fac,squeeze(eq.plasma.dene(:,index,:))',[1e11 1e11],'w-','DisplayName','')
+        end        
         xlabel(ax{i},'R [cm]')
         ylabel(ax{i},'Phi [rad]')
         title(ax{i},sprintf('Z=%.2fcm',dist.z(index)))
