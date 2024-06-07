@@ -1165,8 +1165,8 @@ for i = 1:size(plot_type,2)
             disp('4D Distribution has no toroidal information')
             return;
         end
-        if lsep
-            contour(ax{i},eq.plasma.r*fac,eq.plasma.z*fac,squeeze(eq.plasma.dene(:,index,:))',[1e11 1e11],'w-','DisplayName','')
+        if lsep     
+            contour(ax{i},eq.plasma.r*fac,eq.plasma.phi*fac,squeeze(eq.plasma.dene(:,index,:))',[1e11 1e11],'w-','DisplayName','')
         end
         % Shift theta values
         phi_shifted = mod(phi + pi, 2*pi) - pi;
