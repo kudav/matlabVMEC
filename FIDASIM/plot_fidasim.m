@@ -256,6 +256,7 @@ if nargin > 1
                 lbirth = 1;
                 plot_type{end+1}=varargin{i}; %Make multiple plots possible
             case 'channel'
+                i=i+1;
                 channel=varargin{i};
             case 'eps'
                 leps = 1;                     
@@ -1145,7 +1146,7 @@ for i = 1:size(plot_type,2)
                 intersections = calculateIntersections(geom.spec.lens(:,channel), geom.spec.axis(:,channel), dist.phi(index));
             end
             plot(ax{i},intersections(1,:),intersections(2,:),'k.');
-        end
+        end 
         xlim(ax{i},[r(1)*fac r(end)*fac])
         ylim(ax{i},[z(1)*fac z(end)*fac])
         if fac==1
@@ -1164,25 +1165,61 @@ for i = 1:size(plot_type,2)
             disp('4D Distribution has no toroidal information')
             return;
         end
-        if lsep     
+        if lsep
             contour(ax{i},eq.plasma.r*fac,eq.plasma.z*fac,squeeze(eq.plasma.dene(:,index,:))',[1e11 1e11],'w-','DisplayName','')
         end
-        imagesc(r,phi,squeeze(tmp(:,index,:))')
+        % Shift theta values
+        phi_shifted = mod(phi + pi, 2*pi) - pi;
+
+        % Sort the data according to the shifted theta
+        [phi, idx] = sort(phi_shifted);
+        tmp_shifted = squeeze(tmp(:,index,:));
+        tmp_shifted=tmp_shifted(:, idx);
+       % imagesc(r,phi,tmp_shifted');
+        if lcontour
+            contour(ax{i},r*fac,phi,tmp_shifted',levels,linestyle,'DisplayName',name)
+        else
+            imagesc(ax{i},r*fac,phi,tmp_shifted');
+            c = colorbar(ax{i});
+            c.Label.String = cstring;
+        end
+        if lintersection
+            if channel==0
+                for j=1:size(geom.spec.lens,2)
+                intersections(:,:,j) = getPointsAlongAxis(geom.spec.lens(:,j), geom.spec.axis(:,j),50,500)';
+                end
+            else
+                chandex=find(channel);
+                for j=1:numel(chandex)
+                intersections(:,:,j) = getPointsAlongAxis(geom.spec.lens(:,chandex(j)), geom.spec.axis(:,chandex(j)),50,500)';
+                end
+            end
+            intersections(:,:,j+1)=getPointsAlongAxis(geom.nbi.src, geom.nbi.axis,50,1000)';
+            r_coords=squeeze(sqrt(sum(intersections(1:2,:,:).^2,1)));
+            phi_coords=squeeze(atan2(intersections(2,:,:),intersections(1,:,:)));
+            plot(ax{i},r_coords,phi_coords);
+        end
+
         xlabel(ax{i},'R [cm]')
         ylabel(ax{i},'Phi [rad]')
         title(ax{i},sprintf('Z=%.2fcm',dist.z(index)))
-        c = colorbar(ax{i});
-        c.Label.String = cstring;
         xlim(ax{i},[r(1) r(end)])
+        ylim(ax{i},[phi(1) phi(end)])
     elseif strcmp(plot_type{i}(end-2:end),'tor')
-        pixplot(r,phi,squeeze(tmp(:,index,:)))
+        if lcontour
+            contour(ax{i},r*fac,phi,squeeze(tmp(:,index,:))',levels,linestyle,'DisplayName',name)
+        else
+            imagesc(ax{i},r*fac,phi,tmp(:,index,:)');
+            c = colorbar(ax{i});
+            c.Label.String = cstring;
+        end
+        %pixplot(r,phi,squeeze(tmp(:,index,:)))
         xticks(round(r))
         yticks(round(phi))
         xlabel('R [cm]')
         ylabel('Phi [rad]')
         title(ax{i},sprintf('Z=%.2fcm',dist.z(index)))
-        c = colorbar;
-        c.Label.String = cstring;
+
         xlim([r(1) r(end)])
     end
     if lsave
