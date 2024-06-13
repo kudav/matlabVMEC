@@ -698,10 +698,10 @@ for i = 1:size(plot_type,2)
                 index=index(5);
             end
             if fac == 1
-                plot(ax{i},dist.r, tmp(:,z0_ind,index),linestyle, 'DisplayName',['Denf from f - ' name] );
+                plot(ax{i},dist.r, tmp(:,z0_ind,index),linestyle, 'DisplayName',name );
                 %plot(ax{i},dist.r, movmean(tmp(:,z0_ind,1),15),linestyle, 'DisplayName',['Movmean Denf from f - ' name] );
             else
-                plot(ax{i},dist.r, fac*tmp(:,z0_ind,index),linestyle, 'DisplayName',['Denf from f - ' name ', scaling factor: ' num2str(fac)]);
+                plot(ax{i},dist.r, fac*tmp(:,z0_ind,index),linestyle, 'DisplayName',[ name ', scaling factor: ' num2str(fac)]);
             end
             xlabel('R [m]')
             ylabel('Fast ion density [cm^{-3}]')
@@ -926,9 +926,7 @@ for i = 1:size(plot_type,2)
             ylabel('Pitch [-]')
             ylim([-1 1])
             title(sprintf('%s, R=%.2fcm',char(deblank(geom.spec.id(index(2)))), geom.spec.radius(index(2))));
-        case 'fida'
-
-        case 'spectrum'
+       case 'spectrum'
             specr = spec.full + spec.half + spec.third + spec.halo + spec.dcx + spec.fida;% + spec.brems;
             if isfield(spec,'pfida')
                 specr=specr+spec.pfida;
@@ -1006,9 +1004,11 @@ for i = 1:size(plot_type,2)
             axi_nbi = rotate_points(geom.nbi.axis,vec,deg2rad(rotation));
             los_nbi = [src, src + axi_nbi.*length.*sqrt(sum(src(1:2).^2))];
             los_nbi = reshape(los_nbi,3,2);
-            plot3(ax{i},squeeze(los_nbi(1,:))'*fac,squeeze(los_nbi(2,:))'*fac,squeeze(los_nbi(3,:))'*fac,'-r');
+            plot3(ax{i},squeeze(los_nbi(1,:))'*fac,squeeze(los_nbi(2,:))'*fac,squeeze(los_nbi(3,:))'*fac,'-r')
             plot3(ax{i},squeeze(los_nbi(1,1))'*fac,squeeze(los_nbi(2,1))'*fac,squeeze(los_nbi(3,1))'*fac,'+k');
+            
             plot3(ax{i},[0, 1000*cos(5.8)]*fac,[0, 1000*sin(5.8)]*fac,[0,0],'g');
+            plot3(ax{i},squeeze(geom.spec.closest_points(1,:))'*fac,squeeze(geom.spec.closest_points(2,:))'*fac,squeeze(geom.spec.closest_points(3,:))'*fac,'dk');
             %intersections = calculateIntersections(geom.spec.lens, geom.spec.axis, 1.8);
             %plot3(ax{i},intersections(1,:),intersections(2,:),intersections(3,:),'k.');
             %sname = [file, '_', plot_type{i}];
@@ -1039,6 +1039,7 @@ for i = 1:size(plot_type,2)
                 h=plot(ax{i},squeeze(los(1,channel(:,k),:))'*fac,squeeze(los(2,channel(:,k),:))'*fac ,linestyle, 'DisplayName', displ);
                 %set(h, 'DisplayName', chan_description{k});
             end
+            plot(ax{i},squeeze(geom.spec.closest_points(1,:))'*fac,squeeze(geom.spec.closest_points_cyl(2,:))'*fac,'dk');
             %h=plot(ax,squeeze(los(1,channel,:))'*fac,squeeze(los(2,channel,:))'*fac, 'k');
             %set(h, {'DisplayName'}, cellstr(deblank(geom.spec.id(channel))));
             %legend(h,'Location','bestoutside');
@@ -1174,12 +1175,39 @@ for i = 1:size(plot_type,2)
         % Sort the data according to the shifted theta
         [phi, idx] = sort(phi_shifted);
         tmp_shifted = squeeze(tmp(:,index,:));
-        tmp_shifted=tmp_shifted(:, idx);
+        tmp_shifted=tmp_shifted(:, idx)';
        % imagesc(r,phi,tmp_shifted');
         if lcontour
             contour(ax{i},r*fac,phi,tmp_shifted',levels,linestyle,'DisplayName',name)
         else
-            imagesc(ax{i},r*fac,phi,tmp_shifted');
+            [tmpx,tmpy]=meshgrid(r*fac,phi);
+            [X,Y]=pol2cart(tmpy,tmpx);
+            % Create the interpolant
+            F = scatteredInterpolant(X(:), Y(:), tmp_shifted(:), 'linear', 'none');
+
+            % Define the grid for interpolation
+            xq = linspace(min(X(:)), max(X(:)), 200);
+            yq = linspace(min(Y(:)), max(Y(:)), 200);
+            [Xq, Yq] = meshgrid(xq, yq);
+
+            % Interpolate the data onto the grid
+            %tmp_shifted = F(Xq, Yq);
+            % Define the vertices
+            vertices = [X(:), Y(:)];
+
+            % Define the faces (connectivity)
+            faces = [];
+            for k = 1:size(tmpx, 1) - 1
+                for j = 1:size(tmpx, 2) - 1
+                    v1 = (k-1)*size(tmpx, 2) + j;
+                    v2 = v1 + 1;
+                    v3 = v1 + size(tmpx, 2) + 1;
+                    v4 = v1 + size(tmpx, 2);
+                    faces = [faces; v1, v2, v3, v4];
+                end
+            end
+            patch('Faces', faces, 'Vertices', vertices, 'FaceVertexCData', tmp_shifted(:), 'FaceColor', 'interp', 'EdgeColor', 'none');
+            %imagesc(ax{i},r*fac,phi,tmp_shifted);
             c = colorbar(ax{i});
             c.Label.String = cstring;
         end

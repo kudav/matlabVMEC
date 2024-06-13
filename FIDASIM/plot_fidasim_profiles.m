@@ -39,6 +39,8 @@ end
 lsave = 0;
 lmean = 0;
 lload_fidasim=0;
+lrho=0;
+leps=0;
 plot_type = {};
 linestyle = '+';
 fac = 1;
@@ -61,6 +63,10 @@ if nargin > 2
             case 'avg_frames'
                 i = i+1;
                 avg_frames = varargin{i};
+            case 'rho'
+                lrho=1;
+                i=i+1;
+                b3d_name=varargin{i};
             case 'ax'
                 i=i+1;
                 ax = varargin{i};
@@ -74,6 +80,8 @@ if nargin > 2
             case 'name'
                 i = i+1;
                 name = varargin{i};
+            case 'eps'
+                leps=1;
             case 'style'
                 i = i+1;
                 linestyle = varargin{i};
@@ -91,7 +99,11 @@ spec_name = [filename,'_spectra.h5'];
 geom_name = [filename,'_geometry.h5'];
 
 if ~isfile(geom_name)|| lload_fidasim
-    fida_data=read_fidasim(filename,'geom','spec');
+    if lrho
+        fida_data=read_fidasim(filename,'eq','geom','spec','b3d',b3d_name);
+    else
+        fida_data=read_fidasim(filename,'geom','spec');
+    end
     data=fida_data.spec;
     geom=fida_data.geom;
 else
@@ -205,14 +217,22 @@ for i = 1:size(plot_type,2)
     else
         dispname = ['', name];
     end
-    plot(ax{i},R(dex), tmp,linestyle,'DisplayName',dispname, 'LineWidth',2.0);
-    xlabel(ax{i},'R [cm]')
+    if lrho==1 && isfield(geom.spec,'rho')
+        plot(ax{i},geom.spec.rho(dex), tmp,linestyle,'DisplayName',dispname, 'LineWidth',2.0);
+        xlabel(ax{i},'\rho_{tor} [-]')   
+        xlim([0 1])
+    else
+        plot(ax{i},R(dex), tmp,linestyle,'DisplayName',dispname, 'LineWidth',2.0);
+        xlabel(ax{i},'R [cm]')
+    end
     ylabel(ax{i},ystr)
     if lsave
         sname = [name, '_', plot_type{i}];
         savefig(gcf,[sname,'.fig']);
-        exportgraphics(gcf,[sname,'.eps'],'Resolution',600);
-        exportgraphics(gcf,[sname,'.png'],'Resolution',600);
+        if leps
+            exportgraphics(ax{i}.Parent,[sname,'.eps'],'Resolution',600,'BackgroundColor','none');
+        end
+        exportgraphics(ax{i}.Parent,[sname,'.png'],'Resolution',600);
     end
 end
 plot_data.R = R;

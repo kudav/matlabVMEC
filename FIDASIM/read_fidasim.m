@@ -6,11 +6,7 @@ if (strcmp(runid(end-1:end),'h5'))
     disp(['       runidname: ' runid]);
     return
 end
-
-ldist=1;
-lgeom=1;
-lspec=1;
-lneut=1;
+b3d_S=[];
 if nargin > 1
     i = 1;
     ldist=0;
@@ -36,6 +32,22 @@ if nargin > 1
                 leq=1;
             case 'weight'
                 lweight=1;
+            case 'b3d'
+                if nargin==3
+                    ldist=1;
+                    lgeom=1;
+                    lspec=1;
+                    lneut=1;
+                    leq=1;
+                    lweight=1;
+                    lbirth=1;    
+                end
+                i = i+1;
+                b3d_filename=varargin{i};
+                b3d_S= h5read(b3d_filename,'/S_ARR');
+                r = h5read(b3d_filename,'/raxis');
+                phi = h5read(b3d_filename,'/phiaxis');
+                z = h5read(b3d_filename,'/zaxis');
         end
         i=i+1;
     end
@@ -97,7 +109,14 @@ end
 if isfile(eq_name)&&leq
     disp([' Reading file: ' eq_name]);
     eq = read_hdf5(eq_name);
+    if ~isempty(b3d_S)
+        [rgrid,phigrid,zgrid]=ndgrid(eq.fields.r/100,eq.fields.phi,eq.fields.z/100);
+        eq.fields.s = interp3(r,phi,z,...
+            permute(sqrt(b3d_S),[2 1 3]),rgrid,mod(phigrid,phi(end)),zgrid,'linear',NaN);
+        eq.fields.s=permute(eq.fields.s,[1 3 2]);
+    end    
     fidasim_out.eq=eq;
+
 elseif ~leq
     disp('Skipping equilibrium')
 else
@@ -136,6 +155,30 @@ end
 if isfile(geom_name)&&lgeom
     disp([' Reading file: ' geom_name]);
     geom = read_hdf5(geom_name);
+    if isfield(fidasim_out.eq.fields,'s')
+        disp('Calculating rho values of LOS')
+         % Number of lines of sight in spec
+        nchan = geom.spec.nchan;
+        
+        % Initialize array to hold closest points
+        closest_points = zeros(3, nchan);
+        
+        % Loop through each line of sight in spec
+        for i = 1:nchan
+            % Get the line of sight direction and a point on the line
+            % spec_line_dir = fidasim_out.geom.spec.axis(:,i);
+            % spec_point = fidasim_out.geom.spec.lens(:,i);         
+            % Find the closest point on nbi_axis to the current line of sight
+            closest_points(:,i) = closest_point_on_line(geom.nbi.axis,geom.nbi.src, geom.spec.axis(:,i), geom.spec.lens(:,i));
+        end
+        geom.spec.closest_points=closest_points;
+        [closest_points(2,:),closest_points(1,:),closest_points(3,:)]=cart2pol(closest_points(1,:),closest_points(2,:),closest_points(3,:));
+        geom.spec.closest_points_cyl=closest_points;
+        geom.spec.rho = interp3(r*100,phi,z*100,...
+            permute(sqrt(b3d_S),[2 1 3]),closest_points(1,:),mod(closest_points(2,:),phi(end)),closest_points(3,:),'linear',NaN);
+        %geom.spec.rho = interp3(eq.fields.r,eq.fields.z,eq.fields.phi,...
+        %    permute(eq.fields.s,[2 1 3]),closest_points(1,:),closest_points(3,:),mod(closest_points(2,:),phi(end)),'linear');       
+    end
     fidasim_out.geom=geom;
 elseif ~lgeom
     disp('Skipping geometry')
@@ -156,4 +199,34 @@ end
 function end_el=splitfn(stringvar)
 splitResult = split(stringvar, '/');
 end_el = splitResult{end};
+end
+
+
+
+function closest_point = closest_point_on_line(axis_dir, axis_point, line_dir, line_point)
+    % axis_dir: 3x1 vector representing the direction of the nbi axis
+    % axis_point: 3x1 vector representing a point on the nbi axis
+    % line_dir: 3x1 vector representing the direction of the line of sight
+    % line_point: 3x1 vector representing a point on the line of sight
+    
+    % Calculate the vector between the two points
+    w0 = axis_point - line_point;
+    
+    % Calculate the coefficients for the lines
+    a = dot(axis_dir, axis_dir);
+    b = dot(axis_dir, line_dir);
+    c = dot(line_dir, line_dir);
+    d = dot(axis_dir, w0);
+    e = dot(line_dir, w0);
+    
+    % Calculate the parameters that minimize the distance
+    sc = (b*e - c*d) / (a*c - b^2);
+    tc = (a*e - b*d) / (a*c - b^2);
+    
+    % Calculate the closest points on both lines
+    closest_point_axis = axis_point + sc * axis_dir;
+    closest_point_line = line_point + tc * line_dir;
+    
+    % The closest point on the line of sight to the axis line
+    closest_point = closest_point_line;
 end
