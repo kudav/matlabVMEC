@@ -155,7 +155,8 @@ end
 if isfile(geom_name)&&lgeom
     disp([' Reading file: ' geom_name]);
     geom = read_hdf5(geom_name);
-    if isfield(fidasim_out.eq.fields,'s')
+    if isfield(fidasim_out,'eq')
+        if isfield(fidasim_out.eq.fields,'s')
         disp('Calculating rho values of LOS')
          % Number of lines of sight in spec
         nchan = geom.spec.nchan;
@@ -178,6 +179,7 @@ if isfile(geom_name)&&lgeom
             permute(sqrt(b3d_S),[2 1 3]),closest_points(1,:),mod(closest_points(2,:),phi(end)),closest_points(3,:),'linear',NaN);
         %geom.spec.rho = interp3(eq.fields.r,eq.fields.z,eq.fields.phi,...
         %    permute(eq.fields.s,[2 1 3]),closest_points(1,:),closest_points(3,:),mod(closest_points(2,:),phi(end)),'linear');       
+        end
     end
     fidasim_out.geom=geom;
 elseif ~lgeom

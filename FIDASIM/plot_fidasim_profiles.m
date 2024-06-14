@@ -228,6 +228,9 @@ for i = 1:size(plot_type,2)
     ylabel(ax{i},ystr)
     if lsave
         sname = [name, '_', plot_type{i}];
+        if lrho
+            sname = [sname,'_rho'];
+        end
         savefig(gcf,[sname,'.fig']);
         if leps
             exportgraphics(ax{i}.Parent,[sname,'.eps'],'Resolution',600,'BackgroundColor','none');
