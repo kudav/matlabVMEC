@@ -42,6 +42,7 @@ camera = [];
 skip=1;
 liota=0;
 llen=0;
+dex=[];
 % Handle varargin
 if nargin > 1
     i = 1;
@@ -93,6 +94,9 @@ if nargin > 1
             case 'skip'
                 i=i+1;
                 skip=varargin{i};
+            case 'dex'
+                i=i+1;
+                dex=varargin{i};
             case 'conlen'
                 llen = 1;
             case 'iota'
@@ -109,8 +113,11 @@ end
 switch plottype
     case{0}
         line_dex = nphi:npoinc:nsteps;
-        x=data.R_lines(1:skip:nlines,line_dex);
-        y=data.Z_lines(1:skip:nlines,line_dex);
+        if isempty(dex)
+            dex=1:skip:nlines;
+        end
+        x=data.R_lines(dex,line_dex);
+        y=data.Z_lines(dex,line_dex);
         if liota
             s=ones(size(x));
             %t = repmat(data.iota,size(x,2),1);
