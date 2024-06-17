@@ -191,7 +191,6 @@ for i = 1:size(plot_type,2)
         ax{i} = gca;
         hold on;
     end
-    legend(ax{i},'Location','best');
     switch lower(plot_type{i})
         case 'bck'
             tmp = bg(dex);

@@ -9,7 +9,9 @@ function values = beams3d_getvals(data, r, phi, z, varargin)
     values = struct();
 
     % List of valid field names
-    valid_field_names = {'TE', 'NE', 'TI', 'NI', 'S_ARR', 'U_ARR'};
+    valid_field_names = {'TE', 'NE', 'TI',...
+        'S_ARR', 'U_ARR','POT_ARR', 'ZEFF_ARR',...
+        'B_R', 'B_PHI','B_Z'};
     
     % Iterate over each requested field name in varargin
     for i = 1:length(varargin)
