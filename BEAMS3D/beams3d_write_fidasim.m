@@ -1,18 +1,42 @@
 function [f, denf] = beams3d_write_fidasim(data, name,varargin)
-%BEAMS3D_WRITE FIDASIM produces the FIDASIM input files after a run of
-%beams3d. For new versions of BEAMS3D, the same functionality can be
-%achieved with the -fidasim flag. The distribution function and all
-%quantities are output in the standard BEAMS3D cylindrical grid as standard.
-% Alternatively, 'n', nr, nphi, nz, nE, np can be passed as input to change the
-% grid spacing, or 'axis',raxis,phiaxis,zaxis can be passed for setting the
-% axis precisely. The energy range is set to 0-Emax from the maximum particle
-% velocity. Flow velocities are set to 0 and electric field is calculated
-% from the gradient of POT_ARR. Optionally, the function outputs the fast
-% ion distribution and density as variables.
+% BEAMS3D_WRITE_FIDASIM produces the FIDASIM input files after a run of BEAMS3D.
 %
-%Example usage:
+% For new versions of BEAMS3D, the same functionality can be achieved with the 
+% -fidasim flag. The distribution function and all quantities are output in the 
+% standard BEAMS3D cylindrical grid as standard.
+%
+% Optional parameters can be used to customize the grid spacing or set the axis 
+% precisely:
+%   - 'n', nr, nphi, nz, nE, np: Change the grid spacing.
+%   - 'axis', raxis, phiaxis, zaxis: Set the axis precisely.
+%
+% The energy range is set to 0-Emax from the maximum particle velocity. Flow 
+% velocities are set to 0, and the electric field is calculated from the gradient 
+% of POT_ARR. Optionally, the function outputs the fast ion distribution and density 
+% as variables.
+%
+% Example usage:
 %   data = read_beams3d('test.h5');
-%   beams3d_write_fidasim(data,'fidasim_test');
+%   beams3d_write_fidasim(data, 'fidasim_test', 'n', nr, nphi, nz, nE, np);
+%   beams3d_write_fidasim(data, 'fidasim_test', 'axis', raxis, phiaxis, zaxis);
+%
+% Inputs:
+%   - data: The BEAMS3D data structure obtained from read_beams3d.
+%   - output_filename: The name of the output file for FIDASIM input.
+%
+% Optional Parameters:
+%   - 'n': Change the grid spacing.
+%       nr: Radial grid points.
+%       nphi: Azimuthal grid points.
+%       nz: Axial grid points.
+%       nE: Energy grid points.
+%       np: Pitch angle grid points.
+%   - 'axis': Set the axis precisely.
+%       raxis: Radial axis values.
+%       phiaxis: Azimuthal axis values.
+%       zaxis: Axial axis values.
+
+
 
 ec  = 1.60217662E-19; % electron charge [C]
 amu = 1.66053906660E-27; % Dalton [kg]
