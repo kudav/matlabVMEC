@@ -127,10 +127,14 @@ if nargin > 1
                 plot_type{end+1}=varargin{i}; %Make multiple plots possible
                 lspec = 1;
                 lgeom = 1;
+                leq=1;
+                %ldist=1;
+                linput=1;
                 i=i+1;
                 channel = varargin{i};
                 i=i+1;
                 length=varargin{i};
+                
                 %                 i=i+1;
                 %                 color=varargin{i};
             case {'fida', 'bes', 'fidabes'}
@@ -174,7 +178,7 @@ if nargin > 1
 end
 
 if linput
-    input=read_namelist([filename,'_inputs.dat'],'fidasim_inputs');
+    input=read_namelist([filename,'_inputs.dat'],'FIDASIM_INPUTS');
 end
 
 if ldist
@@ -183,7 +187,7 @@ if ldist
         disp('ERROR: Distribution file not found, check filename!');
         disp(['       Filename: ' filename]);
     end
-
+    
     dr = dist.r(2)-dist.r(1);
     dz = dist.z(2)-dist.z(1);
     nr = double(dist.nr);
@@ -192,27 +196,27 @@ if ldist
         dphi = dist.phi(2) - dist.phi(1);
         % Area
         %area=dr*100.*dz*100;
-
+        
         nphi=double(dist.nphi);
         area=dr.*dz;
         % Volume (function of R)
         vol = dist.r.*dphi.*area;
         vol2d=repmat(vol,[1 dist.nz dist.nphi]);
         %disp(['Total vol2d  : ', num2str(sum(vol2d,'all'))])
-
+        
         tmp = pi*((dist.r(end)+dr).^2-dist.r(1).^2)*(dist.z(end)-dist.z(1));
         %disp(['Total cyl vol: ', num2str(sum(tmp,'all'))]);
         %Correct for trapz(ones(4,1)=3 (edges not correctly accounted for)
         z = trapz(dz*nz/(nz-1),ones(nz,1));
         rdphi = repmat(dist.r.*z,1,dist.nphi);
         tmp = squeeze(trapz(dr*nr/(nr-1),trapz(dphi*nphi/(nphi-1),rdphi,2)));
-
+        
         %disp(['Total int vol: ', num2str(sum(tmp,'all'))]);
         n_fida = sum(dist.denf.*vol2d,'all');
     else
         n_fida = 2*pi*dr*dz*sum(dist.r.*sum(squeeze(dist.denf(:,:,1)),2)); %Axisymmetric only.
     end
-
+    
     [~,z0_ind]=min(abs(dist.z+4.9));
 end
 if leq
@@ -250,7 +254,7 @@ if lspec
         disp(['       Filename: ' filename]);
     end
     %[~,I] = sort(spec.radius);
-
+    
 end
 if lgeom
     geom = read_hdf5(geom_name);
@@ -298,7 +302,7 @@ elseif iscell(channel)
         end
         channel = channel_tmp;
     end
-
+    
 end
 
 for i = 1:size(plot_type,2)
@@ -367,7 +371,7 @@ for i = 1:size(plot_type,2)
             bmir_ind=discretize(bmir,b);
             bmir_ind(isnan(bmir_ind))=1;
             hist=accumarray(bmir_ind(:),tmp(:));
-
+            
             bmir=squeeze(bmir(floor(dist.nr/2),floor(dist.nz/2),1,:));
             [bmir, index]=sort(bmir);
             local=local(:,index);
@@ -553,7 +557,6 @@ for i = 1:size(plot_type,2)
             %             ndens = ndens_F(uvw);
             %             tmp=reshape(ndens,size(r));
             cstring='Neutral Density [neutrals/cm^3]';
-
         case 'ndensvert'
             pixplot(neut.grid.x, neut.grid.z, squeeze(sum(neut.tdens(:,:,20,:) + neut.hdens(:,:,20,:) + neut.fdens(:,:,20,:), 1)))
             xlabel('Beam Grid X [cm]')
@@ -575,8 +578,6 @@ for i = 1:size(plot_type,2)
             cstring = 'Beam neutral density [1/cm^3]';
             c = colorbar;
             c.Label.String = cstring;
-        case 'fida'
-
         case 'spectrum'
             specr = spec.full + spec.half + spec.third + spec.halo + spec.dcx + spec.fida;% + spec.brems;
             if isfield(spec,'pfida')
@@ -601,16 +602,16 @@ for i = 1:size(plot_type,2)
                 cwav_mid=mean(spec.lambda);
                 instfu = box_gauss_funct(spec.lambda,0.,1.,cwav_mid,sim_data.instfu_gamma,sim_data.instfu_box_nm);
                 plot(spec.lambda,conv(specr(:,channel),instfu(:,channel),'same'), 'DisplayName', ['Spectrum - ' name] );
-                                 plot(spec.lambda, conv(spec.full(:,channel),instfu(:,channel),'same'), 'DisplayName',['Full - ' name] );
-                                 plot(spec.lambda, conv(spec.half(:,channel),instfu(:,channel),'same'),  'DisplayName',['Half - ' name] );
+                plot(spec.lambda, conv(spec.full(:,channel),instfu(:,channel),'same'), 'DisplayName',['Full - ' name] );
+                plot(spec.lambda, conv(spec.half(:,channel),instfu(:,channel),'same'),  'DisplayName',['Half - ' name] );
                 plot(spec.lambda, conv(spec.third(:,channel),instfu(:,channel),'same'),  'DisplayName',['Third - ' name] );
                 if ( isfield(spec,'pfida') && lpassive)
                     plot(spec.lambda, conv(spec.pfida(:,channel),instfu(:,channel),'same'),  'DisplayName',['Passive FIDA - ' name] );
                 end
-                                  %plot(spec.lambda, conv(spec.halo(:,channel)+spec.dcx(:,channel),instfu(:,channel),'same'),  'DisplayName',['Halo+DCX - ' name] ); %+spec.brems(:,channel)
-                                  %plot(spec.lambda, conv(spec.halo(:,channel),instfu(:,channel),'same'),  'DisplayName',['Halo only - ' name] ); %+spec.brems(:,channel)
-                                  %plot(spec.lambda, conv(spec.dcx(:,channel),instfu(:,channel),'same'),  'DisplayName',['DCX only - ' name] ); %+spec.brems(:,channel)
-                                  %fprintf('Halo Centered at %.3f nm\n', sum(spec.lambda.*conv(spec.halo(:,channel)+spec.dcx(:,channel),instfu(:,channel),'same'))./sum(conv(spec.halo(:,channel)+spec.dcx(:,channel),instfu(:,channel),'same')));
+                %plot(spec.lambda, conv(spec.halo(:,channel)+spec.dcx(:,channel),instfu(:,channel),'same'),  'DisplayName',['Halo+DCX - ' name] ); %+spec.brems(:,channel)
+                %plot(spec.lambda, conv(spec.halo(:,channel),instfu(:,channel),'same'),  'DisplayName',['Halo only - ' name] ); %+spec.brems(:,channel)
+                %plot(spec.lambda, conv(spec.dcx(:,channel),instfu(:,channel),'same'),  'DisplayName',['DCX only - ' name] ); %+spec.brems(:,channel)
+                %fprintf('Halo Centered at %.3f nm\n', sum(spec.lambda.*conv(spec.halo(:,channel)+spec.dcx(:,channel),instfu(:,channel),'same'))./sum(conv(spec.halo(:,channel)+spec.dcx(:,channel),instfu(:,channel),'same')));
                 % plot(spec.lambda, conv(spec.fida(:,channel),instfu(:,channel),'same'),  'DisplayName',['FIDA - ' name] );
             else
                 plot(spec.lambda,specr(:,channel),linestyle, 'DisplayName', ['Spectrum - ' name] );
@@ -646,12 +647,61 @@ for i = 1:size(plot_type,2)
             los_nbi = reshape(los_nbi,3,2);
             plot3(ax{i},squeeze(los_nbi(1,:))'*fac,squeeze(los_nbi(2,:))'*fac,squeeze(los_nbi(3,:))'*fac,'-r');
             plot3(ax{i},squeeze(los_nbi(1,1))'*fac,squeeze(los_nbi(2,1))'*fac,squeeze(los_nbi(3,1))'*fac,'+k');
-            sname = [filename, '_', plot_type{i}];
+            coords = [input.xmin input.ymin input.zmin;...
+                input.xmax input.ymin input.zmin;...
+                input.xmax input.ymax input.zmin;...
+                input.xmin input.ymax input.zmin;...
+                input.xmin input.ymin input.zmax;...
+                input.xmax input.ymin input.zmax;...
+                input.xmax input.ymax input.zmax;...
+                input.xmin input.ymax input.zmax];
+            tmp=coords(:,2);
+            coords(:,2)=coords(:,1);
+            coords(:,1)=tmp;
+            coords= uvw_to_xyz(input.alpha, input.beta, input.gamma, coords, input.origin);
+            tmp=coords(:,2);
+            coords(:,2)=coords(:,1);
+            coords(:,1)=tmp;
+            faces = [1 2 3 4 1;
+                1 2 6 5 1;
+                2 3 7 6 2;
+                3 4 8 7 3;
+                4 1 5 8 4;
+                5 6 7 8 5];
+            hold on;
+            ha = patch('vertices',coords,'faces',faces);
+            set(ha,'FaceColor','red', 'facealpha', 0.1);
+            plot3(coords(:,1),coords(:,2),coords(:,3),'.')
+            
+            [r,phi,z]=ndgrid([eq.fields.r(1),eq.fields.r(end)],eq.fields.phi,[eq.fields.z(1),eq.fields.z(end)]);
+            x=r.*cos(phi);
+            y=r.*sin(phi);
+            k=boundary(x(:),y(:),z(:));
+            trisurf(k,x,y,z,'Facecolor','red','EdgeColor','none','FaceAlpha',0.1)
+            dphi=eq.fields.phi(2)-eq.fields.phi(1);
+            dr=(eq.fields.r(2)-eq.fields.r(1))*fac;
+            dz=(eq.fields.z(2)-eq.fields.z(1))*fac;
+            [r,phi,z_fida] = ndgrid(eq.fields.r*fac+dr/2,eq.fields.phi+dphi/2,eq.fields.z*fac+dz/2);
+            x_fida=r.*cos(phi);
+            y_fida=r.*sin(phi);
+            tmp=permute(eq.plasma.dene,[1 3 2]);
+            N=scatteredInterpolant(x_fida(:),y_fida(:),z_fida(:),tmp(:),'linear','none');
+            xg=linspace(min(x_fida,[],'all'),max(x_fida,[],'all'),51);
+            yg=linspace(min(y_fida,[],'all'),max(y_fida,[],'all'),52);
+            zg=linspace(min(z_fida,[],'all'),max(z_fida,[],'all'),53);
+            [x_dist,y_dist,z_dist] = meshgrid(xg,yg,zg);
+            dene=N(x_dist,y_dist,z_dist);
+            isosurface(x_dist,y_dist,z_dist,dene,1e13);
+            xlabel('X [cm]')
+            ylabel('Y [cm]')
+            zlabel('Z [cm]')
+            camlight left
+            %sname = [filename, '_', plot_type{i}];
             %writematrix(los_nbi,sname,linestyle);
             % set(h, {'DisplayName'}, cellstr(deblank(geom.spec.id(channel))))
             %legend(h,'Location','bestoutside');
-            axis equal
-            rotate3d on
+            %axis equal;
+           % rotate3d on;
         case 'lostor'
             vec = [0, 0, -1];
             %lens =geom.spec.lens';
@@ -794,7 +844,7 @@ for i = 1:size(plot_type,2)
         %exportgraphics(ax{i}.Parent,[sname,'.eps'],'Resolution',300,'BackgroundColor','none');
         exportgraphics(ax{i}.Parent,[sname,'.png'],'Resolution',600);
     end
-
+    
 end
 
 end
@@ -814,17 +864,75 @@ F = F./sum(F,1);
 F(F<1e-5) = 0;
 end
 
+%
+% function [xyz] = uvw_to_xyz(alpha, beta, gamma, uvw, origin) % From uvw_to_xyz.pro (D3D FIDASIM)
+% sa = sin(alpha); ca = cos(alpha);
+% sb = sin(beta) ; cb = cos(beta);
+% sg = sin(gamma) ; cg = cos(gamma);
+%
+% R = zeros(3);
+% R(1,1) = ca*cb ; R(2,1) = ca*sb*sg - cg*sa ; R(3,1) = sa*sg + ca*cg*sb;
+% R(1,2) = cb*sa ; R(2,2) = ca*cg + sa*sb*sg ; R(3,2) = cg*sa*sb - ca*sg;
+% R(1,3)= -sb   ; R(2,3) = cb*sg            ; R(3,3)= cb*cg;
+%
+% uvw_shifted = uvw-repmat(origin,size(uvw,1),1);
+% xyz = uvw_shifted*R;
+% end
 
-function [xyz] = uvw_to_xyz(alpha, beta, gamma, uvw, origin) % From uvw_to_xyz.pro (D3D FIDASIM)
-sa = sin(alpha); ca = cos(alpha);
-sb = sin(beta) ; cb = cos(beta);
-sg = sin(gamma) ; cg = cos(gamma);
+%Functions converted from D3D FIDASIM idl routines:
 
-R = zeros(3);
-R(1,1) = ca*cb ; R(2,1) = ca*sb*sg - cg*sa ; R(3,1) = sa*sg + ca*cg*sb;
-R(1,2) = cb*sa ; R(2,2) = ca*cg + sa*sb*sg ; R(3,2) = cg*sa*sb - ca*sg;
-R(1,3)= -sb   ; R(2,3) = cb*sg            ; R(3,3)= cb*cg;
+function xyz = uvw_to_xyz(alpha, beta, gamma, uvw, origin)
+% Express non-rotated coordinate 'uvw' in rotated 'xyz' coordinates
+% Arguments:
+%     alpha: Rotation angle about z [radians]
+%     beta: Rotation angle about y' [radians]
+%     gamma: Rotation angle about x" [radians]
+%     uvw: Point in rotated coordinate system
+% Keyword Arguments:
+%     origin: Origin of rotated coordinate system in non-rotated (uvw) coordinates.
 
-uvw_shifted = uvw-repmat(origin,size(uvw,1),1);
-xyz = uvw_shifted*R;
+if nargin < 5
+    origin = [0.0, 0.0, 0.0];
 end
+
+s = size(uvw);
+if numel(s) ~= 2
+    s = [s, 1];
+end
+
+uvw_shifted = uvw - repmat(origin, s(1), 1);
+
+R = tb_zyx(alpha, beta, gamma).';
+
+xyz = R * uvw_shifted.';
+
+xyz = xyz.';
+end
+function R = tb_zyx(a, b, g)
+% Calculates Tait-Bryan z-y'-x" active rotation matrix given rotation angles `alpha`,`beta`,`gamma` in radians
+% Arguments:
+%     a: rotation angle about z [radians]
+%     b: rotation angle about y' [radians]
+%     g: rotation angle about x" [radians]
+% Return Value:
+%     Rotation Matrix
+
+sa = sin(a); ca = cos(a);
+sb = sin(b); cb = cos(b);
+sg = sin(g); cg = cos(g);
+
+R = zeros(3, 3);
+R(1, 1) = ca * cb; R(1, 2) = ca * sb * sg - cg * sa; R(1, 3) = sa * sg + ca * cg * sb;
+R(2, 1) = cb * sa; R(2, 2) = ca * cg + sa * sb * sg; R(2, 3) = cg * sa * sb - ca * sg;
+R(3, 1) = -sb;     R(3, 2) = cb * sg;              R(3, 3) = cb * cg;
+
+% If you prefer returning a transposed matrix
+% R = R';
+
+% If you want to convert the result to single precision (float)
+% R = single(R);
+end
+
+
+
+
