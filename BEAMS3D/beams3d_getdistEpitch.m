@@ -1,30 +1,30 @@
-function dist = beams3d_getdistrpzEpitch(data,r,phi,z,E,pitch)
-%BEAMS3D_GETDISTRPZEPITCH Calculates the distribution function in energy/pitch
-%   This BEAMS3D_GETDISTRPZEPITCH function calculates the distribution 
-%   function at a position in the cylindrical phase space given a BEAMS3D
-%   data structure as returned by READ_BEAMS3D.  Either a single point or 
-%   array of points can be passed to the funciton as R [m], PHI (rad), 
-%   Z [m], Energy [eV], and pitch (vll/v).  Points which fall outside the
-%   domain return 0.  The function returns a 2D array of size (NBEAMS,
+function dist = beams3d_getdistEpitch(data,rho,u,phi,E,pitch)
+%BEAMS3D_GETDISTEPITCH Calculates the distribution function in energy/pitch
+%   This BEAMS3D_GETDISTEPITCH function calculates the distribution 
+%   function at a position in the equilibrium space given a BEAMS3D data
+%   structure as returned by READ_BEAMS3D.  Either a single point or array
+%   of points can be passed to the funciton as rho [arb], u (rad), 
+%   phi [rad], Energy [eV], and pitch (vll/v).  Points which fall outside
+%   the domain return 0.  The function returns a 2D array of size (NBEAMS,
 %   NPTS) where NPTS is the nubmer of requested datapoints.
 %
 % Example usage
 %      % Return an RPZ shaped array
 %      beam_data = read_beams3d('beams3d_test.h5');
-%      raxis   = linspace(4.5,6.5,16);
-%      zaxis   = linspace(-1,1,16);
-%      paxis   = linspace(0,2.*pi,40)
+%      rhoaxis   = linspace(0,1,32);
+%      uaxis   = linspace(0,2.*pi,16);
+%      paxis   = linspace(0,2.*pi,40);
 %      Eaxis   = 0:10E3:100E3;
 %      pitchaxis = -1:0.1:1;
-%      [R,P,Z,E,PITCH] = ndgrid(raxis,paxis,zaxis,Eaxis,pitchaxis);
-%      nsave = size(R);
+%      [RHO,U,PHI,E,PITCH] = ndgrid(rhoaxis,uaxis,paxis,Eaxis,pitchaxis);
+%      nsave = size(rhoaxis);
 %      ntotal = prod(nsave);
-%      R = reshape(R,[1 ntotal]);
-%      P = reshape(P,[1 ntotal]);
-%      Z = reshape(Z,[1 ntotal]);
+%      RHO = reshape(RHO,[1 ntotal]);
+%      U = reshape(U,[1 ntotal]);
+%      PHI = reshape(PHI,[1 ntotal]);
 %      E = reshape(E,[1 ntotal]);
 %      PITCH = reshape(PITCH,[1 ntotal]);
-%      dist=beams3d_getdistrpzEpitch(beam_data,R,P,Z,E,PITCH);a
+%      dist=beams3d_getdistEpitch(beam_data,RHO,U,PHI,E,PITCH);
 %      dist = reshape(dist,[size(dist,1) nsave]);
 %
 % Maintained by: Samuel Lazerson (samuel.lazerson@ipp.mpg.de)
@@ -45,16 +45,6 @@ for i = 1:data.nbeams
     j = find(data.Beam==i,1,'first');
     mass(i) = data.mass(j);
 end
-
-% Interpolate
-S   = permute(data.S_ARR,[2 1 3]);
-U   = permute(data.U_ARR,[2 1 3]);
-pgrid = mod(phi,data.phiaxis(end));
-rhoval= interp3(data.raxis,data.phiaxis,data.zaxis,...
-    sqrt(S),r,pgrid,z);
-uval= interp3(data.raxis,data.phiaxis,data.zaxis,...
-    U,r,pgrid,z);
-rhoval = sqrt(sval);
 
 % We must pad the arrays as data is stored on half-grid mesh
 n = [data.ns_prof1+2, data.ns_prof2+2, data.ns_prof3+2, data.ns_prof4+2, data.ns_prof5+2];
@@ -105,7 +95,7 @@ for i = 1:data.nbeams
     %dist_norm(:,:,:,n(4),:) = 0;
     %dist_norm(:,:,:,:,n(5)) = 0;
     % Interpolate
-    dist(i,:)=interpn(rhoaxis2,uaxis2,paxis2,Vaxis2,Waxis2,dist_norm,rhoval,uval,phi,Vval,Wval,'linear',0).*jac;
+    dist(i,:)=interpn(rhoaxis2,uaxis2,paxis2,Vaxis2,Waxis2,dist_norm,rho,u,phi,Vval,Wval,'linear',0).*jac;
 end
 
 end

@@ -183,30 +183,17 @@ switch calculation
          [dBdphi, dBdr, dBdz] = gradient(fluxphi, phi, r, z);
          gradphi=permute(repmat(phi,1,size(sarr,1),size(sarr,3)),[2 1 3]);
          [dphidphi, dphidr, dphidz] = gradient(gradphi, phi, r, z);
-        gradphi = cat(4, dphidr, dphidphi, dphidz);
-        gradB = cat(4, dBdr, dBdphi, dBdz); % 4th dimension represents the vector components
-        % Xcomp=gradB(:,:,:,1).*cos(gradB(:,:,:,2));
-        % Ycomp=gradB(:,:,:,1).*sin(gradB(:,:,:,2));
-        % gradB(:,:,:,1)=Xcomp;
-        % gradB(:,:,:,2)=Ycomp;
-        % Xcomp=gradphi(:,:,:,1).*cos(gradphi(:,:,:,2));
-        % Ycomp=gradphi(:,:,:,1).*sin(gradphi(:,:,:,2));
-        % gradphi(:,:,:,1)=Xcomp;
-        % gradphi(:,:,:,2)=Ycomp;
-
+        gradphi = cat(4, dphidr, dphidphi./r, dphidz);
+        gradB = cat(4, dBdr, dBdphi./r, dBdz); % 4th dimension represents the vector components
         bpert=cross(gradB,gradphi);
 
-        % Xcomp=sqrt(bpert(:,:,:,1).^2+bpert(:,:,:,2).^2);
-        % Ycomp=atan2(bpert(:,:,:,2),bpert(:,:,:,1));
-        % bpert(:,:,:,1)=Xcomp;
-        % bpert(:,:,:,2)=Ycomp;
     case 'ferrari'
-        fluxphi(sarr>1.5)=0;        
+        fluxphi(sarr>1.05)=0;        
         brc = br;%.* fluxphi;
         bphic = bphi.* fluxphi;
         bzc = bz;%.* fluxphi;        
-        [curl_br,curl_bphi,curl_bz,~] = curl(rg,phig,zg,brc,bphic,bzc);
-        %[curl_br,curl_bphi,curl_bz,~] =  curl(brc,bphic,bzc);
+        %[curl_br,curl_bphi,curl_bz,~] = curl(rg,phig,zg,brc,bphic,bzc);
+        [curl_br,curl_bphi,curl_bz,~] =  curl(brc,bphic,bzc);
         bpert = cat(4, curl_br, curl_bphi, curl_bz);
 end
 curlr=squeeze(bpert(:,:,:,1));%.*rg;

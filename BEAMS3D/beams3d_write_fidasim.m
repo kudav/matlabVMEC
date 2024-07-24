@@ -1,24 +1,49 @@
 function [f, denf] = beams3d_write_fidasim(data, name,varargin)
-%BEAMS3D_WRITE FIDASIM produces the FIDASIM input files after a run of
-%beams3d. For new versions of BEAMS3D, the same functionality can be
-%achieved with the -fidasim flag. The distribution function and all
-%quantities are output in the standard BEAMS3D cylindrical grid as standard.
-% Alternatively, 'n', nr, nphi, nz, nE, np can be passed as input to change the
-% grid spacing, or 'axis',raxis,phiaxis,zaxis can be passed for setting the
-% axis precisely. The energy range is set to 0-Emax from the maximum particle
-% velocity. Flow velocities are set to 0 and electric field is calculated
-% from the gradient of POT_ARR. Optionally, the function outputs the fast
-% ion distribution and density as variables.
+% BEAMS3D_WRITE_FIDASIM produces the FIDASIM input files after a run of BEAMS3D.
 %
-%Example usage:
+% For new versions of BEAMS3D, the same functionality can be achieved with the 
+% -fidasim flag. The distribution function and all quantities are output in the 
+% standard BEAMS3D cylindrical grid as standard.
+%
+% Optional parameters can be used to customize the grid spacing or set the axis 
+% precisely:
+%   - 'n', nr, nphi, nz, nE, np: Change the grid spacing.
+%   - 'axis', raxis, phiaxis, zaxis: Set the axis precisely.
+%
+% The energy range is set to 0-Emax from the maximum particle velocity. Flow 
+% velocities are set to 0, and the electric field is calculated from the gradient 
+% of POT_ARR. Optionally, the function outputs the fast ion distribution and density 
+% as variables.
+%
+% Example usage:
 %   data = read_beams3d('test.h5');
-%   beams3d_write_fidasim(data,'fidasim_test');
+%   beams3d_write_fidasim(data, 'fidasim_test', 'n', nr, nphi, nz, nE, np);
+%   beams3d_write_fidasim(data, 'fidasim_test', 'axis', raxis, phiaxis, zaxis);
+%
+% Inputs:
+%   - data: The BEAMS3D data structure obtained from read_beams3d.
+%   - output_filename: The name of the output file for FIDASIM input.
+%
+% Optional Parameters:
+%   - 'n': Change the grid spacing.
+%       nr: Radial grid points.
+%       nphi: Azimuthal grid points.
+%       nz: Axial grid points.
+%       nE: Energy grid points.
+%       np: Pitch angle grid points.
+%   - 'axis': Set the axis precisely.
+%       raxis: Radial axis values.
+%       phiaxis: Azimuthal axis values.
+%       zaxis: Axial axis values.
+
+
 
 ec  = 1.60217662E-19; % electron charge [C]
 amu = 1.66053906660E-27; % Dalton [kg]
 lmovie = 0;
 lrecalc=0;
 inputs=0;
+beam_dex = 1:data.nbeams;
 
 filename_dist = [name,'_distribution.h5'];
 filename_eq = [name,'_equilibrium.h5'];
@@ -88,6 +113,9 @@ if ~isempty(varargin)
                 inputs=varargin{i};
                 i=i+1;
                 type=varargin{i};
+            case{'beams'}
+                i = i+1;
+                beam_dex = varargin{i};
             otherwise
                 disp(['Unrecognized Option: ' varargin{i}]);
                 return
@@ -156,13 +184,14 @@ if lrecalc
     f(isinf(f))=0;
 else
     f=beams3d_getdistrpzEpitch(data,R,P,Z,E,PITCH);
-    f = sum(f,1);%.*ec/1000*1e6;%*1e6/2/pi/100; %keV and cm^-3;
+    f = f./(1000*1E6); %ev -> keV, m^-3 -> cm^-3
+    f = sum(f(beam_dex,:),1); % Sum over beamlines
     f = reshape(f,[numel(raxis), numel(paxis), numel(zaxis), numel(Eaxis), numel(pitchaxis)]);
     f= permute(f,[4, 5, 1, 3, 2]); %Align with FIDASIM axis order
 
     %Quick fix
-    f(isnan(f))=0;
-    f(isinf(f))=0;
+    %f(isnan(f))=0;
+    %f(isinf(f))=0;
 
     denf = squeeze(trapz(Eaxis, f,1));
     denf = squeeze(trapz(pitchaxis, denf,1));%Integration in velocity space
