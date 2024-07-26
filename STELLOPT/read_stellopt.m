@@ -859,7 +859,7 @@ while ~feof(fid);
         temp=fscanf(fid,'%e',[nels nvars])';
         switch tstr
             % Single Values
-            case {'ASPECT','ASPECT_MAX','BETA','CURTOR','KAPPA','PHIEDGE',...
+            case {'ASPECT','ASPECT_MAX','BETA','CURTOR','KAPPA', 'KAPPA_AVG', 'PHIEDGE',...
                     'VOLUME','WP','RBTOR','R0','Z0','BETATOR','BETAPOL',...
                     'B0'}
                 data.([tstr '_target'])(niter,:) = temp(1);
@@ -1144,7 +1144,7 @@ while ~feof(fid);
                 data.([tstr '_chisq'])(niter,:) = ((temp(:,1)-temp(:,3))./(temp(:,2))).^2;
                 data.([tstr '_s'])(niter,:) = temp(:,4);
             % DKES
-            case {'DKES'}
+            case {'DKES'} 
                 data.([tstr '_target'])(niter,:) = temp(:,1);
                 data.([tstr '_sigma'])(niter,:) = temp(:,2);
                 data.([tstr '_equil'])(niter,:) = temp(:,3);

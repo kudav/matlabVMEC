@@ -37,8 +37,11 @@ te_s=[]; te_f=[];
 ti_s=[]; ti_f=[];
 zeff_s=[]; zeff_f=[];
 pot_s=[]; pot_f=[];
+rhofo = [];
 nr=128; nz=128; nphi=[];
 nrho_dist=64; ntheta_dist = 8; nzeta_dist=40; nvpara_dist = 32; nvperp_dist=16; partvmax=1.25E7;
+nr_fida=64; nz_fida = 64; nphi_fida=40; rmin_fida=4.5; rmax_fida=6.5; zmin_fida=-1.0; zmax_fida=1.0;
+phimin_fida = deg2rad(40); phimax_fida=deg2rad(100); nenergy_fida=32; npitch_fida=32;
 npoinc=2;
 Zatom=1;
 species_type='H';
@@ -64,6 +67,9 @@ if (nargin > 6)
                 case {'pfrac','power_frac','power_fraction'}
                     j=j+1;
                     pfrac=varargin{j};
+                case {'RHOFO'}
+                    j=j+1;
+                    rhofo=varargin{j};
                 case {'file','filename'}
                     j=j+1;
                     filename=varargin{j};
@@ -139,6 +145,29 @@ if (nargin > 6)
                 case {'NPARTICLES_START'}
                     j=j+1;
                     nparticles_start=varargin{j};
+                case {'NDIST'}
+                    j=j+1;
+                    temp = varargin{j};
+                    nrho_dist   = temp(1); 
+                    ntheta_dist = temp(2);
+                    nzeta_dist  = temp(3); 
+                    nvpara_dist = temp(4); 
+                    nvperp_dist = temp(5);
+                    partvmax    = temp(6);
+                case {'NDIST_FIDA'}
+                    j=j+1;
+                    temp = varargin{j};
+                    nr_fida      = temp(1); 
+                    nphi_fida    = temp(2);
+                    nz_fida      = temp(3); 
+                    nenergy_fida = temp(4); 
+                    npitch_fida  = temp(5);
+                    rmin_fida    = temp(6);
+                    rmax_fida    = temp(7);
+                    phimin_fida  = temp(8);
+                    phimax_fida  = temp(9);
+                    zmin_fida    = temp(10);
+                    zmax_fida    = temp(11);
             end
         end
         j=j+1;
@@ -258,6 +287,7 @@ fprintf(fid, '  INT_TYPE = ''LSODE''\n');
 fprintf(fid, '  FOLLOW_TOL = 1.0E-9\n');
 fprintf(fid,['  VC_ADAPT_TOL = ' num2str(vc_adapt_tol,'%20.10E') '\n']);
 fprintf(fid,['  NPOINC = ' num2str(npoinc,'%d') '\n']);
+if ~isempty(rhofo), fprintf(fid,['  RHO_FULLORBIT = ' num2str(rhofo,'%20.10E') '\n']); end
 fprintf(fid, '!--------PROFILES ----\n');
 if ~isempty(pot_f)
     fprintf(fid,[ '  POT_AUX_S = ' num2str(pot_s,'%12.6E  ') '\n']);
@@ -290,6 +320,18 @@ fprintf(fid,['  NZETA_DIST = ' num2str(nzeta_dist,'%d') '\n']);
 fprintf(fid,['  NVPARA_DIST = ' num2str(nvpara_dist,'%d') '\n']);
 fprintf(fid,['  NVPERP_DIST = ' num2str(nvperp_dist,'%d') '\n']);
 fprintf(fid,['  PARTVMAX = ' num2str(partvmax,'%20.10E') '\n']);
+fprintf(fid, '!--------FIDASIM Function Parameters------\n');
+fprintf(fid,['  NR_FIDA       = ' num2str(nr_fida,'%d') '\n']);
+fprintf(fid,['    RMIN_FIDA   = ' num2str(rmin_fida,'%20.10E') '\n']);
+fprintf(fid,['    RMAX_FIDA   = ' num2str(rmax_fida,'%20.10E') '\n']);
+fprintf(fid,['  NPHI_FIDA     = ' num2str(nphi_fida,'%d') '\n']);
+fprintf(fid,['    PHIMIN_FIDA = ' num2str(phimin_fida,'%20.10E') '\n']);
+fprintf(fid,['    PHIMAX_FIDA = ' num2str(phimax_fida,'%20.10E') '\n']);
+fprintf(fid,['  NZ_FIDA       = ' num2str(nz_fida,'%d') '\n']);
+fprintf(fid,['    ZMIN_FIDA   = ' num2str(zmin_fida,'%20.10E') '\n']);
+fprintf(fid,['    ZMAX_FIDA   = ' num2str(zmax_fida,'%20.10E') '\n']);
+fprintf(fid,['  NENERGY_FIDA  = ' num2str(nenergy_fida,'%d') '\n']);
+fprintf(fid,['  NPITCH_FIDA   = ' num2str(npitch_fida,'%d') '\n']);
 fprintf(fid, '!--------Universal Beam Parameters------\n');
 fprintf(fid,['  NPARTICLES_START = ' num2str(nparticles_start,'%d') '\n']);
 fprintf(fid,['  T_END_IN = ' num2str(ntotal,'%d') '*' num2str(t_end,'%-8.2E') '\n']);

@@ -1,22 +1,49 @@
 function [f, denf] = beams3d_write_fidasim(data, name,varargin)
-%BEAMS3D_WRITE FIDASIM produces the FIDASIM input files after a run of
-%beams3d. For new versions of BEAMS3D, the same functionality can be
-%achieved with the -fidasim flag. The distribution function and all
-%quantities are output in the standard BEAMS3D cylindrical grid as standard.
-% Alternatively, 'n', nr, nphi, nz, nE, np can be passed as input to change the
-% grid spacing, or 'axis',raxis,phiaxis,zaxis can be passed for setting the
-% axis precisely. The energy range is set to 0-Emax from the maximum particle
-% velocity. Flow velocities are set to 0 and electric field is calculated
-% from the gradient of POT_ARR. Optionally, the function outputs the fast
-% ion distribution and density as variables.
+% BEAMS3D_WRITE_FIDASIM produces the FIDASIM input files after a run of BEAMS3D.
 %
-%Example usage:
+% For new versions of BEAMS3D, the same functionality can be achieved with the 
+% -fidasim flag. The distribution function and all quantities are output in the 
+% standard BEAMS3D cylindrical grid as standard.
+%
+% Optional parameters can be used to customize the grid spacing or set the axis 
+% precisely:
+%   - 'n', nr, nphi, nz, nE, np: Change the grid spacing.
+%   - 'axis', raxis, phiaxis, zaxis: Set the axis precisely.
+%
+% The energy range is set to 0-Emax from the maximum particle velocity. Flow 
+% velocities are set to 0, and the electric field is calculated from the gradient 
+% of POT_ARR. Optionally, the function outputs the fast ion distribution and density 
+% as variables.
+%
+% Example usage:
 %   data = read_beams3d('test.h5');
-%   beams3d_write_fidasim(data,'fidasim_test');
+%   beams3d_write_fidasim(data, 'fidasim_test', 'n', nr, nphi, nz, nE, np);
+%   beams3d_write_fidasim(data, 'fidasim_test', 'axis', raxis, phiaxis, zaxis);
+%
+% Inputs:
+%   - data: The BEAMS3D data structure obtained from read_beams3d.
+%   - output_filename: The name of the output file for FIDASIM input.
+%
+% Optional Parameters:
+%   - 'n': Change the grid spacing.
+%       nr: Radial grid points.
+%       nphi: Azimuthal grid points.
+%       nz: Axial grid points.
+%       nE: Energy grid points.
+%       np: Pitch angle grid points.
+%   - 'axis': Set the axis precisely.
+%       raxis: Radial axis values.
+%       phiaxis: Azimuthal axis values.
+%       zaxis: Axial axis values.
+
+
 
 ec  = 1.60217662E-19; % electron charge [C]
 amu = 1.66053906660E-27; % Dalton [kg]
 lmovie = 0;
+lrecalc=0;
+inputs=0;
+beam_dex = 1:data.nbeams;
 
 filename_dist = [name,'_distribution.h5'];
 filename_eq = [name,'_equilibrium.h5'];
@@ -39,6 +66,9 @@ zaxis   = data.zaxis';%linspace(min(data.zaxis), max(data.zaxis), 71);
 paxis   = data.phiaxis';%linspace(0, 2*pi, 15);
 nE = data.ns_prof4;
 np = data.ns_prof5;
+dr=raxis(2)-raxis(1);
+dz=zaxis(2)-zaxis(1);
+dphi=paxis(2)-paxis(1);
 % Handle varargin
 if ~isempty(varargin)
     i=1;
@@ -47,23 +77,45 @@ if ~isempty(varargin)
             case{'axis'}
                 i = i + 1;
                 raxis = varargin{i};
+                if size(raxis,2)==1
+                    raxis = raxis';
+                end
                 i = i + 1;
                 paxis = varargin{i};
+                if size(paxis,2)==1
+                    paxis = paxis';
+                end
                 i = i + 1;
                 zaxis = varargin{i};
+                if size(zaxis,2)==1
+                    zaxis = zaxis';
+                end
             case{'n'}
                 i = i + 1;
-                raxis   = linspace(min(data.raxis), max(data.raxis), varargin{i});
+                dr=raxis(2)-raxis(1);
+                raxis   =  ((1:varargin{i})-1).*(raxis(end)-raxis(1)+dr)/varargin{i} + raxis(1)-dr/2;%!Lower grid edges%linspace(min(raxis), max(raxis), varargin{i});
                 i = i + 1;
-                paxis   = linspace(0, 2*pi, varargin{i});
+                dphi=paxis(2)-paxis(1);
+                paxis   = ((1:varargin{i})-1).*(paxis(end)-paxis(1)+dphi)/varargin{i}  + paxis(1)-dphi/2;%linspace(min(data.phiaxis), max(data.phiaxis), varargin{i});
                 i = i + 1;
-                zaxis   = linspace(min(data.zaxis), max(data.zaxis), varargin{i});
+                dz=zaxis(2)-zaxis(1);
+                zaxis   = ((1:varargin{i})-1).*(zaxis(end)-zaxis(1)+dz)/varargin{i} + zaxis(1)-dz/2;
+                %zaxis   = linspace(min(data.zaxis), max(data.zaxis), varargin{i});
                 i = i + 1;
                 nE = varargin{i};
                 i = i + 1;
                 np = varargin{i};
             case{'movie'}
                 lmovie = 1;
+            case{'recalc_dist'}
+                lrecalc=1;
+                i=i+1;
+                inputs=varargin{i};
+                i=i+1;
+                type=varargin{i};
+            case{'beams'}
+                i = i+1;
+                beam_dex = varargin{i};
             otherwise
                 disp(['Unrecognized Option: ' varargin{i}]);
                 return
@@ -72,12 +124,20 @@ if ~isempty(varargin)
     end
 end
 
-Emax = ceil(0.5.*mass.*data.partvmax.^2./ec/1e4)*1e4;
-Eaxis   = 0.5*max(Emax)/nE:max(Emax)/nE:max(Emax);%linspace(0,Emax,nE);%%0:10E3:100E3;
-pitchaxis = -1+1/np:2/np:1;%linspace(-1,1,np);%-1:0.1:1;
+
+
+Emax = ceil(0.5.*mass.*data.partvmax.^2./ec);
+%Eaxis   = 0.5*max(Emax)/nE:max(Emax)/nE:max(Emax);%linspace(0,Emax,nE);%%0:10E3:100E3;
+%pitchaxis = -1+1/np:2/np:1;%linspace(-1,1,np);%-1:0.1:1;
+%Same axis as from BEAMS3D interface:
+Eaxis = ((1:nE) - 0.5) / nE * Emax;
+pitchaxis = ((1:np) - 0.5) / np * 2 - 1;
+
 [R,P,Z,E,PITCH] = ndgrid(raxis,paxis,zaxis,Eaxis,pitchaxis);
+
 [R3,P3,Z3] = ndgrid(raxis,paxis,zaxis);
 [Rd,Pd,Zd] = ndgrid(data.raxis,data.phiaxis,data.zaxis);
+P3_mod=mod(P3,max(data.phiaxis));
 %nsave = size(R);
 ntotal = numel(R);
 R = reshape(R,[1 ntotal]);
@@ -85,21 +145,6 @@ P = reshape(P,[1 ntotal]);
 Z = reshape(Z,[1 ntotal]);
 E = reshape(E,[1 ntotal]);
 PITCH = reshape(PITCH,[1 ntotal]);
-
-
-% V = sqrt(ec.*2.*E./mass);
-% jac = 1.0./(mass.*sqrt(1-PITCH.*PITCH));
-% jac = V ./ mass .* ec / 1000;
-% f=squeeze(sum(data.dist_prof,1));
-% f = f.*jac;
-f=beams3d_getdistrpzEpitch(data,R,P,Z,E,PITCH);
-f = sum(f,1);%.*ec/1000*1e6;%*1e6/2/pi/100; %keV and cm^-3;
-f = reshape(f,[numel(raxis), numel(paxis), numel(zaxis), numel(Eaxis), numel(pitchaxis)]);
-f= permute(f,[4, 5, 1, 3, 2]); %Align with FIDASIM axis order
-
-%Quick fix
-f(isnan(f))=0;
-f(isinf(f))=0;
 
 %Convert to cm
 raxis   = raxis.*100;
@@ -109,37 +154,82 @@ zaxis   = zaxis.*100;
 Eaxis = Eaxis./1000;
 %E = E/1000;
 
-denf = squeeze(trapz(Eaxis, f,1));
-denf = squeeze(trapz(pitchaxis, denf,1));%Integration in velocity space
+if lrecalc
+    if numel(inputs)==0
+        inputs{1}=3; %Indices for orbit source (S(rho,xi)), for npoinc=5 combined runs, this should be 3 or 3:4
+        inputs{2} = 75; %npitch
+        inputs{3} = 50; %nv
+        inputs{4}=50; %norder, Order up to which to calculate the legendre polynomials
+        inputs{5}=[1.0 1.0];%mi/ Ai, in amu
+        inputs{6}=[1.0 1.0];%Zi in ec
+    end
+    [data, rho, pitchaxis, Eaxis, f2D,~,~,~] = mRabbit(data, inputs{1}, inputs{2}, inputs{3}, inputs{4},inputs{5},inputs{6},type);
+    f2D=squeeze(sum(f2D,3,'omitnan'));
+
+    n=squeeze(trapz(pitchaxis,trapz(Eaxis,f2D,1),2));
+    F = griddedInterpolant(Rd-dr/2,Pd-dphi/2,Zd-dz/2,sqrt(data.S_ARR), 'spline');
+    RHO_ARR = F(R3, P3_mod, Z3);
+
+    %RHO_ARR=sqrt(data.S_ARR(:,1:5,:));
+
+    denf=interp1(rho,n,RHO_ARR(:),'linear',0);
+    denf=reshape(denf,size(RHO_ARR));
+    denf=permute(denf,[1 3 2]);
+
+    f=interp1(rho,reshape(f2D,[inputs{3}*inputs{2} numel(rho)])',RHO_ARR(:),'linear',0);
+    f=reshape(f,[size(RHO_ARR), inputs{3} inputs{2}]);
+    f=permute(f,[4 5 1 3 2]);
+    %Quick fix
+    f(isnan(f))=0;
+    f(isinf(f))=0;
+else
+    f=beams3d_getdistrpzEpitch(data,R,P,Z,E,PITCH);
+    f = f./(1000*1E6); %ev -> keV, m^-3 -> cm^-3
+    f = sum(f(beam_dex,:),1); % Sum over beamlines
+    f = reshape(f,[numel(raxis), numel(paxis), numel(zaxis), numel(Eaxis), numel(pitchaxis)]);
+    f= permute(f,[4, 5, 1, 3, 2]); %Align with FIDASIM axis order
+
+    %Quick fix
+    %f(isnan(f))=0;
+    %f(isinf(f))=0;
+
+    denf = squeeze(trapz(Eaxis, f,1));
+    denf = squeeze(trapz(pitchaxis, denf,1));%Integration in velocity space
+end
 
 
 F = griddedInterpolant(Rd,Pd,Zd, data.B_R, 'spline');
-br = F(R3, mod(P3,max(data.phiaxis)), Z3);
+br = F(R3, P3_mod, Z3);
 F = griddedInterpolant(Rd,Pd,Zd, data.B_PHI, 'spline');
-bt = F(R3, mod(P3,max(data.phiaxis)), Z3);
+bt = F(R3, P3_mod, Z3);
 F = griddedInterpolant(Rd,Pd,Zd, data.B_Z, 'spline');
-bz = F(R3, mod(P3,max(data.phiaxis)), Z3);
+bz = F(R3, P3_mod, Z3);
 
 vr = zeros(size(br));
-vt = vr;
+if isfield(data,'VTOR_ARR')
+    F = griddedInterpolant(Rd,Pd,Zd, data.VTOR_ARR*100, 'spline');
+    vt = F(R3, P3_mod, Z3);
+else
+    vt = vr;
+end
 vz = vr;
 
 [er, et, ez] = gradient(data.POT_ARR,mean(diff(raxis)),mean(diff(paxis)),mean(diff(zaxis))); %first output corresponds to gradient along 2nd dimension???
 F = griddedInterpolant(Rd,Pd,Zd, er, 'spline');
-er = F(R3, mod(P3,max(data.phiaxis)), Z3);
+er = F(R3, P3_mod, Z3);
 F = griddedInterpolant(Rd,Pd,Zd, et, 'spline');
-et = F(R3, mod(P3,max(data.phiaxis)), Z3);
+et = F(R3, P3_mod, Z3);
 F = griddedInterpolant(Rd,Pd,Zd, ez, 'spline');
-ez = F(R3, mod(P3,max(data.phiaxis)), Z3);
+ez = F(R3, P3_mod, Z3);
 
 F = griddedInterpolant(Rd,Pd,Zd, data.NE/1e6, 'spline');
-ne = F(R3, mod(P3,max(data.phiaxis)), Z3);
+ne = F(R3, P3_mod, Z3);
 F = griddedInterpolant(Rd,Pd,Zd, data.TE/1000, 'spline');
-te = F(R3, mod(P3,max(data.phiaxis)), Z3);
+te = F(R3, P3_mod, Z3);
 F = griddedInterpolant(Rd,Pd,Zd, data.TI/1000, 'spline');
-ti = F(R3, mod(P3,max(data.phiaxis)), Z3);
+ti = F(R3, P3_mod, Z3);
 F = griddedInterpolant(Rd,Pd,Zd, data.ZEFF_ARR, 'spline');
-zeff = F(R3, mod(P3,max(data.phiaxis)), Z3);
+zeff = F(R3, P3_mod, Z3);
 %denn = zeros(size(zeff));
 
 
