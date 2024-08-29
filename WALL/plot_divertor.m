@@ -138,7 +138,7 @@ switch plottype
         z2 = intSurface.vertices(:,3);
         r2 = sqrt(x2.*x2+y2.*y2);
         if isempty(varargin_temp)
-            plot(x2(intSurface.edges'),y2(intSurface.edges'),'k')
+            plot(x2(intSurface.edges'),y2(intSurface.edges'),'-k')
         else
             plot(x2(intSurface.edges'),y2(intSurface.edges'),varargin_temp{:})
         end
