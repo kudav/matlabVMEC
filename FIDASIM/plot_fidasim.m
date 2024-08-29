@@ -196,9 +196,16 @@ if nargin > 1
                     end
                 end
             case 'vflow2d'
+                plot_type{end+1}=varargin{i}; %Make multiple plots possible
                 ldist=1;
                 leq=1;
                 linput=1;
+                if numel(varargin)>i
+                    if ~ischar(varargin{i+1})
+                        i=i+1;
+                        index_in = varargin{i};
+                    end
+                end                
             case {'lcfs','sep','separatrix'}
                 lsep=1;
                 leq=1;
@@ -631,8 +638,13 @@ for i = 1:size(plot_type,2)
             % end
             %return
         case 'vflow2d'
-            disp('Testing!')
-            trapz(dist.energy,dist.f.*dist.energy./,1)         
+            v=sqrt(dist.energy./input.ab/amu*1e3*ec*2);
+            tmp=squeeze(trapz(dist.pitch,trapz(v,dist.f.*v,1),2));
+            tmp=tmp./dist.denf.*1e-6;
+            r = eq.plasma.r;
+            z = eq.plasma.z;
+            phi=eq.plasma.phi;
+            cstring = 'Fast ion vlow vel. [m/s]';            
         case 'profiles'
             yyaxis(ax{i},'left')
             plot(ax{i},eq.plasma.r, squeeze(eq.plasma.te(:,z0_ind,1)), 'DisplayName',['T_e - ' name] );
