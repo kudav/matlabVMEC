@@ -58,6 +58,12 @@ function [ ax, n_fida ] = plot_fidasim(file,varargin)
 % Version:       1.00
 
 ec=1.6021773300E-19; % Charge of an electron (leave alone)
+amu = 1.66053906660E-27; % Dalton [kg]
+
+
+n_fida=-1;
+input={};
+
 
 if ischar(file)
     if (strcmp(file(end-1:end),'h5'))
@@ -144,11 +150,9 @@ levels=2;
 linput=0;
 ltorint=0;
 lintersection=0;
-n_fida=-1;
 sim_data = {};
 channel = 0;
 linestyle = '-';
-color='k';
 index=1;
 index_in=[];
 rotation=0;
@@ -170,7 +174,7 @@ if nargin > 1
                 plot_type{end+1}=varargin{i}; %Make multiple plots possible
                 leq = 1;
                 if numel(varargin)>i
-                    if ~isstr(varargin{i+1})
+                    if ~ischar(varargin{i+1})
                         i=i+1;
                         index = varargin{i};
                     end
@@ -186,7 +190,7 @@ if nargin > 1
                 ldist = 1;
                 leq=1;
                 if numel(varargin)>i
-                    if ~isstr(varargin{i+1})
+                    if ~ischar(varargin{i+1})
                         i=i+1;
                         index_in = varargin{i};
                     end
@@ -204,7 +208,7 @@ if nargin > 1
                 lweight=1;
                 lgeom=1;
                 if numel(varargin)>i
-                    if ~isstr(varargin{i+1})
+                    if ~ischar(varargin{i+1})
                         i=i+1;
                         index_in = varargin{i};
                     end
@@ -215,7 +219,7 @@ if nargin > 1
                 lgeom=1;
                 linput=1;
                 if numel(varargin)>i
-                    if ~isstr(varargin{i+1})
+                    if ~ischar(varargin{i+1})
                         i=i+1;
                         index_in = varargin{i};
                     else
@@ -229,7 +233,7 @@ if nargin > 1
                 linput=1;
                 leq=1;
                 if numel(varargin)>i
-                    if ~isstr(varargin{i+1})
+                    if ~ischar(varargin{i+1})
                         i=i+1;
                         index_in = varargin{i};
                     else
@@ -270,9 +274,13 @@ if nargin > 1
             case 'mean'
                 lmean = 1;
             case {'contour','contours'}
-                lcontour = 1;
-                i=i+1;
-                levels = varargin{i};
+                lcontour=1;
+                if numel(varargin)>i
+                    if ~ischar(varargin{i+1})
+                        i=i+1;
+                        levels = varargin{i};
+                    end
+                end
             case 'sim_data'
                 i=i+1;
                 sim_data = varargin{i};
@@ -340,13 +348,21 @@ if ~lloaded
         [~,z0_ind]=min(abs(dist.z));
     end
     if leq
+        if isfile(eq_name)
         eq = read_hdf5(eq_name);
-        if ~isstruct(eq)
+        elseif linput && isfile(input.equilibrium_file)
+                 eq = read_hdf5(input.equilibrium_file);
+        else
             disp('ERROR: Equilbirium file not found, check filename!');
             disp(['       Filename: ' file]);
+            if ldist
             eq={};
             eq.fields.z=dist.z;
             eq.fields.r=dist.r;
+            else
+                disp('No R/Z information available, exiting!')
+                return
+            end
         end
         [~,z0_ind]=min(abs(eq.fields.z));
     end
@@ -359,17 +375,6 @@ if ~lloaded
         if ~isstruct(neut)
             disp('ERROR: Neutrals file not found, check filename!');
             disp(['       Filename: ' file]);
-        end
-        neut.dens = neut.fdens+neut.hdens+neut.tdens;%+neut.dcxdens+neut.halodens;
-        neut.dens=squeeze(sum(neut.dens,1));%Sum over all levels
-        neut.grid.vol = repmat(mean(diff(neut.grid.x))*mean(diff(neut.grid.y))*mean(diff(neut.grid.z)),size(neut.grid.x_grid));
-        neut.nparts=neut.dens.*neut.grid.vol;
-        nneutrals=1.d6*input.pinj/ (1.d3*input.einj*ec...
-            *( input.current_fractions(1)      ...
-            +  input.current_fractions(2)/2.d0 ...
-            +  input.current_fractions(3)/3.d0 ) );
-        if index==1
-            [~,index]=min(abs(neut.grid.z));
         end
     end
 
@@ -399,7 +404,25 @@ if ~lloaded
         end
     end
 else
+    if leq
     [~,z0_ind]=min(abs(eq.fields.z));
+    elseif ldist
+        [~,z0_ind]=min(abs(dist.z));
+    end
+end
+
+if lneut
+            neut.dens = neut.fdens+neut.hdens+neut.tdens;%+neut.dcxdens+neut.halodens;
+        neut.dens=squeeze(sum(neut.dens,1));%Sum over all levels
+        neut.grid.vol = repmat(mean(diff(neut.grid.x))*mean(diff(neut.grid.y))*mean(diff(neut.grid.z)),size(neut.grid.x_grid));
+        neut.nparts=neut.dens.*neut.grid.vol;
+        nneutrals=1.d6*input.pinj/ (1.d3*input.einj*ec...
+            *( input.current_fractions(1)      ...
+            +  input.current_fractions(2)/2.d0 ...
+            +  input.current_fractions(3)/3.d0 ) );
+        if index==1
+            [~,index]=min(abs(neut.grid.z));
+        end
 end
 
 if ischar(channel)
@@ -555,22 +578,29 @@ for i = 1:size(plot_type,2)
                 tmp=squeeze(dist.f(:,:,r0_ind,z0_ind,phi0_ind));
             elseif numel(index_in)==6
                 [~,r0_ind]=min(abs(eq.fields.r-index_in(1)));
-                [~,phi0_ind]=min(abs(eq.fields.phi-index_in(3)));
                 [~,z0_ind]=min(abs(eq.fields.z-index_in(5)));
                 [~,r1_ind]=min(abs(eq.fields.r-index_in(2)));
-                [~,phi1_ind]=min(abs(eq.fields.phi-index_in(4)));
-                [~,z1_ind]=min(abs(eq.fields.z-index_in(6)));     
-                if phi0_ind==phi1_ind
-                    phi1_ind=phi0_ind+1;
-                end
+                [~,z1_ind]=min(abs(eq.fields.z-index_in(6)));
                 if r0_ind==r1_ind
                     r1_ind=r0_ind+1;
                 end   
                 if z0_ind==z1_ind
                     z1_ind=z0_ind+1;
                 end                
-                fprintf('R=%.2f, Phi=%.2f, Z=%.2f\n',eq.fields.r(r0_ind),eq.fields.phi(phi0_ind),eq.fields.z(z0_ind))
-                tmp = squeeze(trapz(dist.phi(phi0_ind:phi1_ind),trapz(dist.z(z0_ind:z1_ind),dist.f(:,:,r0_ind:r1_ind,z0_ind:z1_ind,phi0_ind:phi1_ind),4),5));
+              
+                if ndims(dist.f) == 5
+                    [~,phi0_ind]=min(abs(eq.fields.phi-index_in(3)));
+                    [~,phi1_ind]=min(abs(eq.fields.phi-index_in(4)));
+                    if phi0_ind==phi1_ind
+                        phi1_ind=phi0_ind+1;
+                    end
+                    fprintf('R=%.2f, Phi=%.2f, Z=%.2f\n',eq.fields.r(r0_ind),eq.fields.phi(phi0_ind),eq.fields.z(z0_ind))
+                    tmp = squeeze(trapz(dist.phi(phi0_ind:phi1_ind),trapz(dist.z(z0_ind:z1_ind),dist.f(:,:,r0_ind:r1_ind,z0_ind:z1_ind,phi0_ind:phi1_ind),4),5));
+                else
+                    fprintf('R=%.2f,  Z=%.2f\n',eq.fields.r(r0_ind),eq.fields.z(z0_ind))
+                    tmp = squeeze(trapz(dist.z(z0_ind:z1_ind),dist.f(:,:,r0_ind:r1_ind,z0_ind:z1_ind),4))*2*pi;
+                end                
+                
                 rtmp = permute(repmat(dist.r(r0_ind:r1_ind),1,size(tmp,1),size(tmp,2),1),[2,3,1]);
                 tmp = squeeze(trapz(dist.r(r0_ind:r1_ind),rtmp.*tmp,3));
             end
@@ -851,7 +881,7 @@ for i = 1:size(plot_type,2)
             neut_r = sqrt(neut.grid.x_grid(:).^2+neut.grid.y_grid(:).^2);
             neut_phi= atan2(neut.grid.y_grid(:),neut.grid.x_grid(:));
             neut_z = neut.grid.z_grid(:);
-            [discphi,phiedges]=discretize(neut_phi,16);
+            [discphi,phiedges]=discretize(neut_phi,32);
             [discr,redges]=discretize(neut_r,64);
             [discz,zedges]=discretize(neut_z,128);
             r = redges(1:end-1)+mean(diff(redges))/2;
@@ -870,9 +900,9 @@ for i = 1:size(plot_type,2)
             neut_r = sqrt(neut.grid.x_grid(:).^2+neut.grid.y_grid(:).^2);
             neut_phi= atan2(neut.grid.y_grid(:),neut.grid.x_grid(:));
             neut_z = neut.grid.z_grid(:);
-            [discphi,phiedges]=discretize(neut_phi,8);
-            [discr,redges]=discretize(neut_r,64);
-            [discz,zedges]=discretize(neut_z,32);
+            [discphi,phiedges]=discretize(neut_phi,32);
+            [discr,redges]=discretize(neut_r,128);
+            [discz,zedges]=discretize(neut_z,64);
             r = redges(1:end-1)+mean(diff(redges))/2;
             phi = phiedges(1:end-1)+mean(diff(phiedges))/2;
             z = zedges(1:end-1)+mean(diff(zedges))/2;
@@ -1245,13 +1275,13 @@ for i = 1:size(plot_type,2)
         if lcontour
             contour(ax{i},r*fac,phi,squeeze(tmp(:,index,:))',levels,linestyle,'DisplayName',name)
         else
-            imagesc(ax{i},r*fac,phi,tmp(:,index,:)');
+            imagesc(ax{i},r*fac,phi,squeeze(tmp(:,index,:))');
             c = colorbar(ax{i});
             c.Label.String = cstring;
         end
         %pixplot(r,phi,squeeze(tmp(:,index,:)))
-        xticks(round(r))
-        yticks(round(phi))
+        xticks(unique(round(r,2,'significant')))
+        yticks(unique(round(phi,2,'significant')))
         xlabel('R [cm]')
         ylabel('Phi [rad]')
         title(ax{i},sprintf('Z=%.2fcm',dist.z(index)))
