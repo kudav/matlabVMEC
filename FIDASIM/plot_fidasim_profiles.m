@@ -41,6 +41,7 @@ lmean = 0;
 lload_fidasim=0;
 lrho=0;
 leps=0;
+lspecbes=0;
 plot_type = {};
 linestyle = '+';
 fac = 1;
@@ -63,6 +64,8 @@ if nargin > 2
             case 'avg_frames'
                 i = i+1;
                 avg_frames = varargin{i};
+            case 'spec_bes'
+                lspecbes=1;
             case 'rho'
                 lrho=1;
                 i=i+1;
@@ -175,7 +178,7 @@ dispersion_tmp = repmat(dispersion_tmp,1,size(spec,2));
 bg_dex = (lambda > bg_range(1)) & (lambda < bg_range(2));
 bg = sum(brems.*dispersion_tmp.*bg_dex,1,'omitnan')./sum(dispersion_tmp.*bg_dex,1,'omitnan');
 
-if size(bes_range,1)==numel(bg)&&~lload_fidasim
+if size(bes_range,1)==numel(bg)&&(~lload_fidasim|lspecbes)
 bes_dex = (lambda > repmat(bes_range(:,1)',size(lambda,1),1)) & (lambda < repmat(bes_range(:,2)',size(lambda,1),1));
 bes = sum(spec.*dispersion_tmp.*bes_dex,1,'omitnan');
 else
