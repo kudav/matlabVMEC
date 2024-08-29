@@ -79,11 +79,14 @@ if isfile(nml_name)
         end
     end
     runid=input.runid;
+    %This ignores the full path and searches for the files in the current
+    %directory
     dist_name=splitfn(input.distribution_file);
     eq_name=splitfn(input.equilibrium_file);
     geom_name=splitfn(input.geometry_file);
     neut_name=splitfn(input.neutrals_file);
     fidasim_out.input=input;
+
 else
     disp('Could not find input namelist, using defaults!')
     dist_name = [runid, '_distribution.h5'];
@@ -92,9 +95,19 @@ else
     geom_name = [runid,'_geometry.h5'];
 end
 
+
 birth_name = [runid,'_birth.h5'];
 weight_name = [runid,'_fida_weights.h5'];
 spec_name = [runid,'_spectra.h5'];
+
+fidasim_out.dist_name=dist_name;
+fidasim_out.eq_name=eq_name;
+fidasim_out.neut_name=neut_name;
+fidasim_out.geom_name=geom_name;
+fidasim_out.birth_name=birth_name;
+fidasim_out.weight_name=weight_name;
+fidasim_out.spec_name=spec_name;
+
 
 if isfile(dist_name)&&ldist
     disp([' Reading file: ' dist_name]);
@@ -103,6 +116,7 @@ if isfile(dist_name)&&ldist
 elseif ~ldist
     disp('Skipping distribution')
 else
+    disp([' Reading file: ' dist_name]);
     disp('ERROR: Distribution file not found, check runidname!');
 end
 
