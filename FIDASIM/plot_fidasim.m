@@ -170,7 +170,8 @@ if nargin > 1
             case {'overview','profiles','profiles_rho',...
                     'ba','br2d','bt2d','bz2d',...
                     'brtor','bttor','bztor','q2d',...
-                    'te2d','ne2d','ti2d', 'vt2d','zeff2d'}
+                    'te2d','ne2d','ti2d', 'er2d','et2d','ez2d',...
+                    'vt2d','zeff2d'}
                 plot_type{end+1}=varargin{i}; %Make multiple plots possible
                 leq = 1;
                 if numel(varargin)>i
@@ -693,6 +694,24 @@ for i = 1:size(plot_type,2)
             phi=eq.plasma.phi;
             tmp = eq.plasma.vt;
             cstring = 'Toroidal Rotation [cm/s]';
+        case 'er2d'
+            r = eq.plasma.r;
+            z = eq.plasma.z;
+            phi=eq.plasma.phi;
+            tmp = eq.fields.er;
+            cstring = 'Electric field in R direcion [V/m]';    
+        case 'et2d'
+            r = eq.plasma.r;
+            z = eq.plasma.z;
+            phi=eq.plasma.phi;
+            tmp = eq.fields.et;
+            cstring = 'Electric field in phi direcion [V/m]';  
+        case 'ez2d'
+            r = eq.plasma.r;
+            z = eq.plasma.z;
+            phi=eq.plasma.phi;
+            tmp = eq.fields.ez;
+            cstring = 'Electric field in Z direcion [V/m]';             
         case 'zeff2d'
             r = eq.plasma.r;
             z = eq.plasma.z;
