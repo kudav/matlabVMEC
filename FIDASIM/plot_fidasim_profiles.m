@@ -9,6 +9,10 @@ function plot_data = plot_fidasim_profiles(filename,in_data,varargin)
 %      [~,in_data] = get_bes_fida_aug_data(filename,in_data,'fidabes');
 %      plot_fidasim_profiles(filename,in_data,'X');
 %      !!! 'X' can be 'fida', 'bes', or 'fidabes'
+%      plot_fidasim_profiles(filename,_,'spec_bes'); %Forces calculating BES from
+%      total spectrum, not from full energy component
+%      plot_fidasim_profiles(filename,_,'spec_bes'); %Forces calculating BES from
+%      total spectrum, not from full energy component
 %
 % Miscellaneous Arguments
 %      plot_fidasim(runid,'mean'); %Apply moving mean to spectrum
@@ -55,7 +59,8 @@ if nargin > 2
     i = 1;
     while i < nargin-1
         switch varargin{i}
-            case {'FIDA','BES','FIDABES','fida','bes','fidabes','bck'}
+            case {'FIDA','BES','FIDABES','fida','bes','fidabes','bck',...
+                    'fidaspec','fida_bck'}
                 plot_type{end+1}=varargin{i}; %Make multiple plots possible
             case 'mean'
                 lmean =1;
@@ -64,7 +69,7 @@ if nargin > 2
             case 'avg_frames'
                 i = i+1;
                 avg_frames = varargin{i};
-            case 'spec_bes'
+            case 'spec_bes' 
                 lspecbes=1;
             case 'rho'
                 lrho=1;
@@ -213,20 +218,24 @@ for i = 1:size(plot_type,2)
             tmp = fida(dex);
             ystr = 'FIDA';
         case 'fidabes'
-            tmp = fida(dex)./bes(dex);
+            tmp = fida(dex)./bes(dex).*diff(bes_range(dex,:),1,2)'./diff(fida_range);
             ystr = 'FIDA/BES';
-            % if lsave
-            %     legend(ax{i},'Location','southwest');
-            % end
+        case 'fida_bck'
+            tmp = fida(dex)./bg(dex).*diff(bg_range)./diff(fida_range);
+            ystr = 'FIDA/BACKGROUND';            
+        case 'fidaspec'
+            plot(ax{i},lambda(fida_dex), spec(fida_dex,dex),linestyle,'DisplayName',dispname, 'LineWidth',2.0);
+            xlabel(ax{i},'Wavelength [nm]')
+            ylabel(ax{i},'Intensity [Ph/(s nm m^2 sr)]')               
+             continue
+
 
     end
 
     if fac~=1
         tmp = tmp.*fac;
-        dispname = ['', name, ', scaling factor: ' num2str(fac)];
-    else
-        dispname = ['', name];
     end
+
     if lrho==1 && isfield(geom.spec,'rho')
         plot(ax{i},geom.spec.rho(dex), tmp,linestyle,'DisplayName',dispname, 'LineWidth',2.0);
         xlabel(ax{i},'\rho_{tor} [-]')   
