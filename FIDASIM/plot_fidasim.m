@@ -17,14 +17,14 @@ function [ ax, n_fida ] = plot_fidasim(file,varargin)
 %      plot_fidasim(f,'bx_'); %Magnetic field (x=r,p,z)
 %      plot_fidasim(f,'denf_'); %FI density on RZ plane from denf
 %      plot_fidasim(f,'fdenf_'); %FI density on RZ plane from f
-%       optionally followed by index for toroidal/vertical position    
+%       optionally followed by index for toroidal/vertical position
 %       '_' can be:     none: profile@midplane, index for tor. pos
 %                       '2d': R-Z plane
 %                           'torint' calculates toroidal integral
 %                           'intersection' calculates LOS positions
 %                           'sep' shows approx. separatrix pos.
 %                       'tor': midplane (R-PHI)
-%       
+%
 %      plot_fidasim(f,'energy'); %Energy dist, int. over real space
 %      plot_fidasim(f,'pitch'); %Pitch dist, int. over real space
 %      plot_fidasim(f,'epplot'); %E-p dist.,  int. over real space
@@ -41,7 +41,7 @@ function [ ax, n_fida ] = plot_fidasim(file,varargin)
 %
 % Miscellaneous Arguments
 %      plot_fidasim(f,'mean'); %Apply moving mean to spectrum
-%      plot_fidasim(f,'contour', levels); %Show area as contour plot 
+%      plot_fidasim(f,'contour', levels); %Show area as contour plot
 %      plot_fidasim(f,'style', linestyle); %Define linestyle
 %      plot_fidasim(f,'sim_data',sim_data); %Used for dispersion
 %      plot_fidasim(f,'save'); %Export figures (.fig and .png)
@@ -116,7 +116,7 @@ else
     end
     if isfield(file,'spec')
         spec=file.spec;
-    end    
+    end
     if isfield(file,'birth')
         birth=file.birth;
     end
@@ -166,7 +166,7 @@ tmp2=[];
 if nargin > 1
     i = 1;
     while i < nargin
-        switch varargin{i}
+        switch lower(varargin{i})
             case {'overview','profiles','profiles_rho',...
                     'ba','br2d','bt2d','bz2d',...
                     'brtor','bttor','bztor','q2d',...
@@ -206,7 +206,7 @@ if nargin > 1
                         i=i+1;
                         index_in = varargin{i};
                     end
-                end                
+                end
             case {'lcfs','sep','separatrix'}
                 lsep=1;
                 leq=1;
@@ -276,9 +276,9 @@ if nargin > 1
                 i=i+1;
                 channel=varargin{i};
             case 'eps'
-                leps = 1;                     
+                leps = 1;
             case 'legend'
-                llegend = 1;                
+                llegend = 1;
             case 'mean'
                 lmean = 1;
             case {'contour','contours'}
@@ -357,16 +357,16 @@ if ~lloaded
     end
     if leq
         if isfile(eq_name)
-        eq = read_hdf5(eq_name);
+            eq = read_hdf5(eq_name);
         elseif linput && isfile(input.equilibrium_file)
-                 eq = read_hdf5(input.equilibrium_file);
+            eq = read_hdf5(input.equilibrium_file);
         else
             disp('ERROR: Equilbirium file not found, check filename!');
             disp(['       Filename: ' file]);
             if ldist
-            eq={};
-            eq.fields.z=dist.z;
-            eq.fields.r=dist.r;
+                eq={};
+                eq.fields.z=dist.z;
+                eq.fields.r=dist.r;
             else
                 disp('No R/Z information available, exiting!')
                 return
@@ -413,24 +413,24 @@ if ~lloaded
     end
 else
     if leq
-    [~,z0_ind]=min(abs(eq.fields.z));
+        [~,z0_ind]=min(abs(eq.fields.z));
     elseif ldist
         [~,z0_ind]=min(abs(dist.z));
     end
 end
 
 if lneut
-            neut.dens = neut.fdens+neut.hdens+neut.tdens;%+neut.dcxdens+neut.halodens;
-        neut.dens=squeeze(sum(neut.dens,1));%Sum over all levels
-        neut.grid.vol = repmat(mean(diff(neut.grid.x))*mean(diff(neut.grid.y))*mean(diff(neut.grid.z)),size(neut.grid.x_grid));
-        neut.nparts=neut.dens.*neut.grid.vol;
-        nneutrals=1.d6*input.pinj/ (1.d3*input.einj*ec...
-            *( input.current_fractions(1)      ...
-            +  input.current_fractions(2)/2.d0 ...
-            +  input.current_fractions(3)/3.d0 ) );
-        if index==1
-            [~,index]=min(abs(neut.grid.z));
-        end
+    neut.dens = neut.fdens+neut.hdens+neut.tdens;%+neut.dcxdens+neut.halodens;
+    neut.dens=squeeze(sum(neut.dens,1));%Sum over all levels
+    neut.grid.vol = repmat(mean(diff(neut.grid.x))*mean(diff(neut.grid.y))*mean(diff(neut.grid.z)),size(neut.grid.x_grid));
+    neut.nparts=neut.dens.*neut.grid.vol;
+    nneutrals=1.d6*input.pinj/ (1.d3*input.einj*ec...
+        *( input.current_fractions(1)      ...
+        +  input.current_fractions(2)/2.d0 ...
+        +  input.current_fractions(3)/3.d0 ) );
+    if index==1
+        [~,index]=min(abs(neut.grid.z));
+    end
 end
 
 if ischar(channel)
@@ -591,11 +591,11 @@ for i = 1:size(plot_type,2)
                 [~,z1_ind]=min(abs(eq.fields.z-index_in(6)));
                 if r0_ind==r1_ind
                     r1_ind=r0_ind+1;
-                end   
+                end
                 if z0_ind==z1_ind
                     z1_ind=z0_ind+1;
-                end                
-              
+                end
+
                 if ndims(dist.f) == 5
                     [~,phi0_ind]=min(abs(eq.fields.phi-index_in(3)));
                     [~,phi1_ind]=min(abs(eq.fields.phi-index_in(4)));
@@ -607,8 +607,8 @@ for i = 1:size(plot_type,2)
                 else
                     fprintf('R=%.2f,  Z=%.2f\n',eq.fields.r(r0_ind),eq.fields.z(z0_ind))
                     tmp = squeeze(trapz(dist.z(z0_ind:z1_ind),dist.f(:,:,r0_ind:r1_ind,z0_ind:z1_ind),4))*2*pi;
-                end                
-                
+                end
+
                 rtmp = permute(repmat(dist.r(r0_ind:r1_ind),1,size(tmp,1),size(tmp,2),1),[2,3,1]);
                 tmp = squeeze(trapz(dist.r(r0_ind:r1_ind),rtmp.*tmp,3));
             end
@@ -645,7 +645,7 @@ for i = 1:size(plot_type,2)
             r = eq.plasma.r;
             z = eq.plasma.z;
             phi=eq.plasma.phi;
-            cstring = 'Fast ion vlow vel. [m/s]';            
+            cstring = 'Fast ion vlow vel. [m/s]';
         case 'profiles'
             yyaxis(ax{i},'left')
             plot(ax{i},eq.plasma.r, squeeze(eq.plasma.te(:,z0_ind,1)), 'DisplayName',['T_e - ' name] );
@@ -669,7 +669,7 @@ for i = 1:size(plot_type,2)
             yyaxis(ax{i},'right')
             plot(ax{i},eq.plasma.profiles.rho, eq.plasma.profiles.dene, 'DisplayName',['n_e - ' name] );
             xlabel(ax{i},'rho [-]')
-            ylabel(ax{i},'n_e [cm^{-3}]')            
+            ylabel(ax{i},'n_e [cm^{-3}]')
         case 'ne2d'
             r = eq.plasma.r;
             z = eq.plasma.z;
@@ -699,19 +699,19 @@ for i = 1:size(plot_type,2)
             z = eq.plasma.z;
             phi=eq.plasma.phi;
             tmp = eq.fields.er;
-            cstring = 'Electric field in R direcion [V/m]';    
+            cstring = 'Electric field in R direcion [V/m]';
         case 'et2d'
             r = eq.plasma.r;
             z = eq.plasma.z;
             phi=eq.plasma.phi;
             tmp = eq.fields.et;
-            cstring = 'Electric field in phi direcion [V/m]';  
+            cstring = 'Electric field in phi direcion [V/m]';
         case 'ez2d'
             r = eq.plasma.r;
             z = eq.plasma.z;
             phi=eq.plasma.phi;
             tmp = eq.fields.ez;
-            cstring = 'Electric field in Z direcion [V/m]';             
+            cstring = 'Electric field in Z direcion [V/m]';
         case 'zeff2d'
             r = eq.plasma.r;
             z = eq.plasma.z;
@@ -860,7 +860,7 @@ for i = 1:size(plot_type,2)
                 tmp = squeeze(trapz(dist.pitch(p_min:p_max),trapz(dist.energy(e_min:e_max),dist.f(e_min:e_max,p_min:p_max,:,:,:),1),2));
                 phi=[phi; phi(1)];
                 tmp=cat(3,tmp,tmp(:,:,1));
-            end 
+            end
             [x_fida,y_fida,z_fida] = ndgrid(r+dr/2,mod(phi,max(phi+dphi/2))+dphi/2,z./1+dz/2);
             denf=permute(tmp(:,:,:),[1 3 2]);
             xg = x_fida .* cos(y_fida);
@@ -992,7 +992,7 @@ for i = 1:size(plot_type,2)
             ylabel('Pitch [-]')
             ylim([-1 1])
             title(sprintf('%s, R=%.2fcm',char(deblank(geom.spec.id(index_in(2)))), geom.spec.radius(index_in(2))));
-       case 'spectrum'
+        case 'spectrum'
             specr = spec.full + spec.half + spec.third + spec.halo + spec.dcx + spec.fida;% + spec.brems;
             if isfield(spec,'pfida')
                 specr=specr+spec.pfida;
@@ -1022,19 +1022,20 @@ for i = 1:size(plot_type,2)
                 plot(spec.lambda,conv(specr(:,channel),instfu(:,channel),'same'), 'DisplayName', ['Spectrum - ' name] );
                 %plot(spec.lambda,specr(:,channel), 'DisplayName', ['Spectrum no instfu - ' name] );
                 %plot(spec.lambda,specr(:,channel), 'DisplayName', ['Spectrum - ' name] );
-                plot(spec.lambda, conv(spec.full(:,channel),instfu(:,channel),'same'), 'DisplayName',['Full - ' name] );
-                plot(spec.lambda, conv(spec.half(:,channel),instfu(:,channel),'same'),  'DisplayName',['Half - ' name] );
-                plot(spec.lambda, conv(spec.third(:,channel),instfu(:,channel),'same'),  'DisplayName',['Third - ' name] );
+                %plot(spec.lambda, conv(spec.full(:,channel),instfu(:,channel),'same'), 'DisplayName',['Full - ' name] );
+                %plot(spec.lambda, spec.full(:,channel), 'DisplayName',['Full - ' name] );
+                %plot(spec.lambda, conv(spec.half(:,channel),instfu(:,channel),'same'),  'DisplayName',['Half - ' name] );
+                %plot(spec.lambda, conv(spec.third(:,channel),instfu(:,channel),'same'),  'DisplayName',['Third - ' name] );
                 if ( isfield(spec,'pfida') && lpassive)
                     plot(spec.lambda, conv(spec.pfida(:,channel),instfu(:,channel),'same'),  'DisplayName',['Passive FIDA - ' name] );
                 end
                 if ( isfield(spec,'brems') && lbrems)
                     plot(spec.lambda, conv(spec.brems(:,channel),instfu(:,channel),'same'),  'DisplayName',['Bremsstrahlung - ' name] );
                 end
-                %plot(spec.lambda, conv(spec.halo(:,channel),instfu(:,channel),'same'),  'DisplayName',['Halo only - ' name] ); %+spec.brems(:,channel)
+                %plot(spec.lambda, conv(spec.halo(:,channel)+spec.dcx(:,channel),instfu(:,channel),'same'),  'DisplayName',['Halo+DCX - ' name] ); %+spec.brems(:,channel)
                 %plot(spec.lambda, conv(spec.dcx(:,channel),instfu(:,channel),'same'),  'DisplayName',['DCX only - ' name] ); %+spec.brems(:,channel)
                 %fprintf('Halo Centered at %.3f nm\n', sum(spec.lambda.*conv(spec.halo(:,channel)+spec.dcx(:,channel),instfu(:,channel),'same'))./sum(conv(spec.halo(:,channel)+spec.dcx(:,channel),instfu(:,channel),'same')));
-                %plot(spec.lambda, conv(spec.fida(:,channel),instfu(:,channel),'same'),  'DisplayName',['FIDA - ' name] );
+                plot(spec.lambda, conv(spec.fida(:,channel),instfu(:,channel),'same'),  'DisplayName',['FIDA - ' name] );
             else
                 plot(spec.lambda,specr(:,channel),linestyle, 'DisplayName', ['Spectrum - ' name] );
                 if (isfield(spec,'pfida' ) && lpassive)
@@ -1044,6 +1045,7 @@ for i = 1:size(plot_type,2)
                     plot(spec.lambda,spec.brems(:,channel),  'DisplayName',['Bremsstrahlung - ' name] );
                 end
                 plot(spec.lambda,spec.fida(:,channel),linestyle, 'DisplayName', ['FIDA - ' name] );
+                plot(spec.lambda, spec.halo(:,channel)+spec.dcx(:,channel),  'DisplayName',['Halo+DCX - ' name] ); %+spec.brems(:,channel)
                 disp('Supply in_data from e.g. get_bes_fida_aug_data for more plots!')
             end
             hold on
@@ -1072,7 +1074,7 @@ for i = 1:size(plot_type,2)
             los_nbi = reshape(los_nbi,3,2);
             plot3(ax{i},squeeze(los_nbi(1,:))'*fac,squeeze(los_nbi(2,:))'*fac,squeeze(los_nbi(3,:))'*fac,'-r')
             plot3(ax{i},squeeze(los_nbi(1,1))'*fac,squeeze(los_nbi(2,1))'*fac,squeeze(los_nbi(3,1))'*fac,'+k');
-            
+
             %plot3(ax{i},[0, 1000*cos(5.8)]*fac,[0, 1000*sin(5.8)]*fac,[0,0],'g');
             %plot3(ax{i},squeeze(geom.spec.closest_points(1,:))'*fac,squeeze(geom.spec.closest_points(2,:))'*fac,squeeze(geom.spec.closest_points(3,:))'*fac,'dk');
             %intersections = calculateIntersections(geom.spec.lens, geom.spec.axis, 1.8);
@@ -1208,16 +1210,16 @@ for i = 1:size(plot_type,2)
         end
         if lintersection
             if channel==0
-            intersections = calculateIntersections(geom.spec.lens, geom.spec.axis, dist.phi(index));
+                intersections = calculateIntersections(geom.spec.lens, geom.spec.axis, dist.phi(index));
             else
                 intersections = calculateIntersections(geom.spec.lens(:,channel), geom.spec.axis(:,channel), dist.phi(index));
             end
             plot(ax{i},intersections(1,:),intersections(2,:),'k.');
-        end 
+        end
         if strcmp(get(ax{i},'XLimMode'),'auto')
-        xlim(ax{i},[r(1)*fac r(end)*fac])
-        ylim(ax{i},[z(1)*fac z(end)*fac])
-        axis equal
+            xlim(ax{i},[r(1)*fac r(end)*fac])
+            ylim(ax{i},[z(1)*fac z(end)*fac])
+            axis equal
         end
         if fac==1
             xlabel(ax{i},'R [cm] ')
@@ -1226,7 +1228,7 @@ for i = 1:size(plot_type,2)
             xlabel(ax{i},['R [cm] * ', num2str(fac)])
             ylabel(ax{i},['Z [cm] * ', num2str(fac)])
         end
-        
+
     elseif strcmp(plot_type{i}(end-2:end),'tor') && ldist
         if index==1
             index=z0_ind;
@@ -1235,7 +1237,7 @@ for i = 1:size(plot_type,2)
             disp('4D Distribution has no toroidal information')
             return;
         end
-        if lsep     
+        if lsep
             contour(ax{i},eq.plasma.r*fac,eq.plasma.phi*fac,squeeze(eq.plasma.dene(:,index,:))',[1e11 1e11],'w-','DisplayName','')
         end
         % Shift theta values
@@ -1245,7 +1247,7 @@ for i = 1:size(plot_type,2)
         [phi, idx] = sort(phi_shifted);
         tmp_shifted = squeeze(tmp(:,index,:));
         tmp_shifted=tmp_shifted(:, idx)';
-       % imagesc(r,phi,tmp_shifted');
+        % imagesc(r,phi,tmp_shifted');
         if lcontour
             contour(ax{i},r*fac,phi,tmp_shifted',levels,linestyle,'DisplayName',name)
         else
@@ -1283,12 +1285,12 @@ for i = 1:size(plot_type,2)
         if lintersection
             if channel==0
                 for j=1:size(geom.spec.lens,2)
-                intersections(:,:,j) = getPointsAlongAxis(geom.spec.lens(:,j), geom.spec.axis(:,j),50,500)';
+                    intersections(:,:,j) = getPointsAlongAxis(geom.spec.lens(:,j), geom.spec.axis(:,j),50,500)';
                 end
             else
                 chandex=find(channel);
                 for j=1:numel(chandex)
-                intersections(:,:,j) = getPointsAlongAxis(geom.spec.lens(:,chandex(j)), geom.spec.axis(:,chandex(j)),50,500)';
+                    intersections(:,:,j) = getPointsAlongAxis(geom.spec.lens(:,chandex(j)), geom.spec.axis(:,chandex(j)),50,500)';
                 end
             end
             intersections(:,:,j+1)=getPointsAlongAxis(geom.nbi.src, geom.nbi.axis,50,1000)';
@@ -1321,7 +1323,7 @@ for i = 1:size(plot_type,2)
     end
     if lsave
         if llegend
-        legend(ax{i},'Interpreter','none');
+            legend(ax{i},'Interpreter','none');
         end
         sname = [file, '_', name,  '_', plot_type{i},'_',sprintf('%d',index_in)];
         savefig(ax{i}.Parent,[sname,'.fig'])
@@ -1368,22 +1370,22 @@ xyz = uvw_shifted*R;
 end
 
 function intersections = calculateIntersections(lens, axis, phi)
-    % numLines = size(lens, 2);
-    % intersections = zeros(3,numLines); % Prepare for (x, y, z) points
-    % % X value for all intersections based on fixed phi
-    % x_fixed = radius' .* cos(phi);
-    
-        t = (tan(phi).*lens(1,:)-lens(2,:))./(axis(2,:)-axis(1,:).*tan(phi));
-        intersections = lens + t .* axis;    
-    % for i = 1:numLines
-    %     t = (x_fixed - lens(1, i)) / axis(1, i);
-    %     intersections(:, i) = lens(:, i) + t(i) .* axis(:, i);
-    % end
-     intersections(1,:)=sqrt(intersections(1,:).^2+intersections(2,:).^2);
-    intersections=intersections([1,3],:); %Only R,Z coordinates
-    % Filter out any intersections that do not make physical sense, e.g., if t < 0
-    intersections = intersections(:,t >= 0);
-    
-    return;
+% numLines = size(lens, 2);
+% intersections = zeros(3,numLines); % Prepare for (x, y, z) points
+% % X value for all intersections based on fixed phi
+% x_fixed = radius' .* cos(phi);
+
+t = (tan(phi).*lens(1,:)-lens(2,:))./(axis(2,:)-axis(1,:).*tan(phi));
+intersections = lens + t .* axis;
+% for i = 1:numLines
+%     t = (x_fixed - lens(1, i)) / axis(1, i);
+%     intersections(:, i) = lens(:, i) + t(i) .* axis(:, i);
+% end
+intersections(1,:)=sqrt(intersections(1,:).^2+intersections(2,:).^2);
+intersections=intersections([1,3],:); %Only R,Z coordinates
+% Filter out any intersections that do not make physical sense, e.g., if t < 0
+intersections = intersections(:,t >= 0);
+
+return;
 end
 

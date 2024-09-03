@@ -11,8 +11,6 @@ function plot_data = plot_fidasim_profiles(filename,in_data,varargin)
 %      !!! 'X' can be 'fida', 'bes', or 'fidabes'
 %      plot_fidasim_profiles(filename,_,'spec_bes'); %Forces calculating BES from
 %      total spectrum, not from full energy component
-%      plot_fidasim_profiles(filename,_,'spec_bes'); %Forces calculating BES from
-%      total spectrum, not from full energy component
 %
 % Miscellaneous Arguments
 %      plot_fidasim(runid,'mean'); %Apply moving mean to spectrum
