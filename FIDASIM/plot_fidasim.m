@@ -269,7 +269,8 @@ if nargin > 1
                 disp(['ERROR: Option ', varargin{i}, ' not implemented here. Use plot_fidasim_profiles instead.']);
                 lspec = 1;
                 lgeom = 1;
-            case {'birth_R','birth_Z','birth_pitch', 'birth_phi'}
+            case {'birth_r','birth_z','birth_pitch', 'birth_phi'...
+                    'birth_r_gc','birth_z_gc','birth_phi_gc' }
                 lbirth = 1;
                 plot_type{end+1}=varargin{i}; %Make multiple plots possible
             case 'channel'
@@ -1144,35 +1145,51 @@ for i = 1:size(plot_type,2)
             end
             return
             %legend(h,'Location','bestoutside');
-        case 'birth_r'
-            edges = min(birth.ri(1,:)):1:max(birth.ri(1,:));
-            dists = discretize(birth.ri(1,:),edges);
+        case {'birth_r','birth_r_gc'}
+            if strcmp(plot_type{i}(end-1:end),'gc')
+                edges = min(birth.ri_gc(1,:)):1:max(birth.ri_gc(1,:));
+                dists = discretize(birth.ri_gc(1,:),edges);
+            else
+                edges = min(birth.ri(1,:)):1:max(birth.ri(1,:));
+                dists = discretize(birth.ri(1,:),edges);
+            end
             dists(isnan(dists)) = 1;
             weights = birth.weight;
-            sum(weights)
+            %sum(weights)
             histo = accumarray(dists',weights,[size(edges,2)-1, 1]);
             x=(edges(2:end-1)+mean(diff(edges))/2)/100;
             plot(ax{i},x,histo(2:end),'DisplayName','FIDASIM','LineWidth', 2.0)
             xlabel('R [m]')
             ylabel('Deposition [particles/s]')
-        case 'birth_z'
-            edges = min(birth.ri(2,:)):1:max(birth.ri(2,:));
-            dists = discretize(birth.ri(2,:),edges);
+        case {'birth_z','birth_z_gc'}
+            if strcmp(plot_type{i}(end-1:end),'gc')
+                edges = min(birth.ri_gc(2,:)):1:max(birth.ri_gc(2,:));
+                dists = discretize(birth.ri_gc(2,:),edges);
+            else
+                edges = min(birth.ri(2,:)):1:max(birth.ri(2,:));
+                dists = discretize(birth.ri(2,:),edges);
+            end
             dists(isnan(dists)) = 1;
             weights = birth.weight;
-            sum(weights)
+            %sum(weights);
             histo = accumarray(dists',weights,[size(edges,2)-1, 1]);
             x=(edges(2:end-1)+mean(diff(edges))/2)/100;
             plot(ax{i},x,histo(2:end),'DisplayName','FIDASIM','LineWidth', 2.0)
             xlabel('Z [m]')
             ylabel('Deposition [particles/s]')
-        case 'birth_phi'
-            birth_phi=mod(birth.ri(3,:),2*pi);
-            edges = min(birth_phi):0.01:max(birth_phi);
-            dists = discretize(birth_phi,edges);
+        case {'birth_phi','birth_phi_gc'}
+            if strcmp(plot_type{i}(end-1:end),'gc')
+                birth_phi=mod(birth.ri_gc(3,:),2*pi);
+                edges = min(birth_phi):0.01:max(birth_phi);
+                dists = discretize(birth_phi,edges);
+            else
+                birth_phi=mod(birth.ri(3,:),2*pi);
+                edges = min(birth_phi):0.01:max(birth_phi);
+                dists = discretize(birth_phi,edges);
+            end
             dists(isnan(dists)) = 1;
             weights = birth.weight;
-            sum(weights)
+            %sum(weights)
             histo = accumarray(dists',weights,[size(edges,2)-1, 1]);
             x=(edges(2:end-1)+mean(diff(edges))/2);
             plot(ax{i},x,histo(2:end),'DisplayName','FIDASIM','LineWidth', 2.0)
