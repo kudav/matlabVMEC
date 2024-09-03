@@ -1078,23 +1078,63 @@ for i = 1:size(plot_type,2)
             axi_nbi = rotate_points(geom.nbi.axis,vec,deg2rad(rotation));
             los_nbi = [src, src + axi_nbi.*length.*sqrt(sum(src(1:2).^2))];
             los_nbi = reshape(los_nbi,3,2);
-            plot3(ax{i},squeeze(los_nbi(1,:))'*fac,squeeze(los_nbi(2,:))'*fac,squeeze(los_nbi(3,:))'*fac,'-r')
+            plot3(ax{i},squeeze(los_nbi(1,:))'*fac,squeeze(los_nbi(2,:))'*fac,squeeze(los_nbi(3,:))'*fac,'-r');
             plot3(ax{i},squeeze(los_nbi(1,1))'*fac,squeeze(los_nbi(2,1))'*fac,squeeze(los_nbi(3,1))'*fac,'+k');
-
-            %plot3(ax{i},[0, 1000*cos(5.8)]*fac,[0, 1000*sin(5.8)]*fac,[0,0],'g');
-            %plot3(ax{i},squeeze(geom.spec.closest_points(1,:))'*fac,squeeze(geom.spec.closest_points(2,:))'*fac,squeeze(geom.spec.closest_points(3,:))'*fac,'dk');
-            %intersections = calculateIntersections(geom.spec.lens, geom.spec.axis, 1.8);
-            %plot3(ax{i},intersections(1,:),intersections(2,:),intersections(3,:),'k.');
-            %sname = [file, '_', plot_type{i}];
+            coords = [input.xmin input.ymin input.zmin;...
+                input.xmax input.ymin input.zmin;...
+                input.xmax input.ymax input.zmin;...
+                input.xmin input.ymax input.zmin;...
+                input.xmin input.ymin input.zmax;...
+                input.xmax input.ymin input.zmax;...
+                input.xmax input.ymax input.zmax;...
+                input.xmin input.ymax input.zmax];
+            tmp=coords(:,2);
+            coords(:,2)=coords(:,1);
+            coords(:,1)=tmp;
+            coords= uvw_to_xyz(input.alpha, input.beta, input.gamma, coords, input.origin);
+            tmp=coords(:,2);
+            coords(:,2)=coords(:,1);
+            coords(:,1)=tmp;
+            faces = [1 2 3 4 1;
+                1 2 6 5 1;
+                2 3 7 6 2;
+                3 4 8 7 3;
+                4 1 5 8 4;
+                5 6 7 8 5];
+            hold on;
+            ha = patch('vertices',coords,'faces',faces);
+            set(ha,'FaceColor','red', 'facealpha', 0.1);
+            plot3(coords(:,1),coords(:,2),coords(:,3),'.')
+            
+            [r,phi,z]=ndgrid([eq.fields.r(1),eq.fields.r(end)],eq.fields.phi,[eq.fields.z(1),eq.fields.z(end)]);
+            x=r.*cos(phi);
+            y=r.*sin(phi);
+            k=boundary(x(:),y(:),z(:));
+            trisurf(k,x,y,z,'Facecolor','red','EdgeColor','none','FaceAlpha',0.1)
+            dphi=eq.fields.phi(2)-eq.fields.phi(1);
+            dr=(eq.fields.r(2)-eq.fields.r(1))*fac;
+            dz=(eq.fields.z(2)-eq.fields.z(1))*fac;
+            [r,phi,z_fida] = ndgrid(eq.fields.r*fac+dr/2,eq.fields.phi+dphi/2,eq.fields.z*fac+dz/2);
+            x_fida=r.*cos(phi);
+            y_fida=r.*sin(phi);
+            tmp=permute(eq.plasma.dene,[1 3 2]);
+            N=scatteredInterpolant(x_fida(:),y_fida(:),z_fida(:),tmp(:),'linear','none');
+            xg=linspace(min(x_fida,[],'all'),max(x_fida,[],'all'),51);
+            yg=linspace(min(y_fida,[],'all'),max(y_fida,[],'all'),52);
+            zg=linspace(min(z_fida,[],'all'),max(z_fida,[],'all'),53);
+            [x_dist,y_dist,z_dist] = meshgrid(xg,yg,zg);
+            dene=N(x_dist,y_dist,z_dist);
+            isosurface(x_dist,y_dist,z_dist,dene,1e13);
             xlabel('X [cm]')
             ylabel('Y [cm]')
             zlabel('Z [cm]')
-            grid on
+            camlight left
+            %sname = [filename, '_', plot_type{i}];
             %writematrix(los_nbi,sname,linestyle);
             % set(h, {'DisplayName'}, cellstr(deblank(geom.spec.id(channel))))
             %legend(h,'Location','bestoutside');
-            axis equal
-            rotate3d on
+            %axis equal;
+           % rotate3d on;
         case 'lostor'
             vec = [0, 0, -1];
             %lens =geom.spec.lens';
@@ -1377,19 +1417,78 @@ F(F<1e-5) = 0;
 end
 
 
-function [xyz] = uvw_to_xyz(alpha, beta, gamma, uvw, origin) % From uvw_to_xyz.pro (D3D FIDASIM)
-sa = sin(alpha); ca = cos(alpha);
-sb = sin(beta) ; cb = cos(beta);
-sg = sin(gamma) ; cg = cos(gamma);
+%
+% function [xyz] = uvw_to_xyz(alpha, beta, gamma, uvw, origin) % From uvw_to_xyz.pro (D3D FIDASIM)
+% sa = sin(alpha); ca = cos(alpha);
+% sb = sin(beta) ; cb = cos(beta);
+% sg = sin(gamma) ; cg = cos(gamma);
+%
+% R = zeros(3);
+% R(1,1) = ca*cb ; R(2,1) = ca*sb*sg - cg*sa ; R(3,1) = sa*sg + ca*cg*sb;
+% R(1,2) = cb*sa ; R(2,2) = ca*cg + sa*sb*sg ; R(3,2) = cg*sa*sb - ca*sg;
+% R(1,3)= -sb   ; R(2,3) = cb*sg            ; R(3,3)= cb*cg;
+%
+% uvw_shifted = uvw-repmat(origin,size(uvw,1),1);
+% xyz = uvw_shifted*R;
+% end
 
-R = zeros(3);
-R(1,1) = ca*cb ; R(2,1) = ca*sb*sg - cg*sa ; R(3,1) = sa*sg + ca*cg*sb;
-R(1,2) = cb*sa ; R(2,2) = ca*cg + sa*sb*sg ; R(3,2) = cg*sa*sb - ca*sg;
-R(1,3)= -sb   ; R(2,3) = cb*sg            ; R(3,3)= cb*cg;
+%Functions converted from D3D FIDASIM idl routines:
 
-uvw_shifted = uvw-repmat(origin,size(uvw,1),1);
-xyz = uvw_shifted*R;
+function xyz = uvw_to_xyz(alpha, beta, gamma, uvw, origin)
+% Express non-rotated coordinate 'uvw' in rotated 'xyz' coordinates
+% Arguments:
+%     alpha: Rotation angle about z [radians]
+%     beta: Rotation angle about y' [radians]
+%     gamma: Rotation angle about x" [radians]
+%     uvw: Point in rotated coordinate system
+% Keyword Arguments:
+%     origin: Origin of rotated coordinate system in non-rotated (uvw) coordinates.
+
+if nargin < 5
+    origin = [0.0, 0.0, 0.0];
 end
+
+s = size(uvw);
+if numel(s) ~= 2
+    s = [s, 1];
+end
+
+uvw_shifted = uvw - repmat(origin, s(1), 1);
+
+R = tb_zyx(alpha, beta, gamma).';
+
+xyz = R * uvw_shifted.';
+
+xyz = xyz.';
+end
+function R = tb_zyx(a, b, g)
+% Calculates Tait-Bryan z-y'-x" active rotation matrix given rotation angles `alpha`,`beta`,`gamma` in radians
+% Arguments:
+%     a: rotation angle about z [radians]
+%     b: rotation angle about y' [radians]
+%     g: rotation angle about x" [radians]
+% Return Value:
+%     Rotation Matrix
+
+sa = sin(a); ca = cos(a);
+sb = sin(b); cb = cos(b);
+sg = sin(g); cg = cos(g);
+
+R = zeros(3, 3);
+R(1, 1) = ca * cb; R(1, 2) = ca * sb * sg - cg * sa; R(1, 3) = sa * sg + ca * cg * sb;
+R(2, 1) = cb * sa; R(2, 2) = ca * cg + sa * sb * sg; R(2, 3) = cg * sa * sb - ca * sg;
+R(3, 1) = -sb;     R(3, 2) = cb * sg;              R(3, 3) = cb * cg;
+
+% If you prefer returning a transposed matrix
+% R = R';
+
+% If you want to convert the result to single precision (float)
+% R = single(R);
+end
+
+
+
+
 
 function intersections = calculateIntersections(lens, axis, phi)
 % numLines = size(lens, 2);
