@@ -6,8 +6,8 @@ function plot_data = plot_fidasim_profiles(filename,in_data,varargin)
 %two functions.
 %
 % Example usage
-%      [~,in_data] = get_bes_fida_aug_data(filename,'t_point',3.5,'fidabes');
-%      plot_fidasim_profiles(filename,in_data,'X);
+%      [~,in_data] = get_bes_fida_aug_data(filename,in_data,'fidabes');
+%      plot_fidasim_profiles(filename,in_data,'X');
 %      !!! 'X' can be 'fida', 'bes', or 'fidabes'
 %
 % Miscellaneous Arguments
@@ -155,8 +155,10 @@ end
 
 
 cwav_mid=mean(lambda);
+cwav_mid = interp1(1:size(lambda,1),lambda,size(lambda,1)/2.);
 if ~lload_fidasim
-instfu = box_gauss_funct(lambda,0.,1.,cwav_mid,in_data.instfu_gamma,in_data.instfu_box_nm);
+    %Flipud is necessary to emulate fplot.pro behavior from FIDASIM4
+instfu = flipud(box_gauss_funct(lambda,0.,1.,cwav_mid,in_data.instfu_gamma,in_data.instfu_box_nm));
 disp(['Applying Instrument function to FIDASIM data: ', filename]);
 if numel(in_data.instfu_gamma)==numel(in_data.names)
     disp('Careful! Only applying Instrument function to known LOS!')
@@ -179,14 +181,20 @@ bg_dex = (lambda > bg_range(1)) & (lambda < bg_range(2));
 bg = sum(brems.*dispersion_tmp.*bg_dex,1,'omitnan')./sum(dispersion_tmp.*bg_dex,1,'omitnan');
 
 if size(bes_range,1)==numel(bg)&&(~lload_fidasim|lspecbes)
-bes_dex = (lambda > repmat(bes_range(:,1)',size(lambda,1),1)) & (lambda < repmat(bes_range(:,2)',size(lambda,1),1));
-bes = sum(spec.*dispersion_tmp.*bes_dex,1,'omitnan');
+    bes_dex = (lambda > repmat(bes_range(:,1)',size(lambda,1),1)) & (lambda < repmat(bes_range(:,2)',size(lambda,1),1));
+    bes = sum(spec.*dispersion_tmp.*bes_dex,1,'omitnan');
 else
     bes = sum(full.*dispersion_tmp,1,'omitnan')/3;%Approximate BES by full Beam component
 end
 
 fida_dex = (lambda > fida_range(1)) & (lambda < fida_range(2));
 fida = sum(spec.*dispersion_tmp.*fida_dex,1,'omitnan');
+
+if fac~=1
+    dispname = ['', name, ', scaling factor: ' num2str(fac)];
+else
+    dispname = ['', name];
+end
 
 for i = 1:size(plot_type,2)
     if i>numel(ax)
