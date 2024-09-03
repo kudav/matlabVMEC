@@ -717,7 +717,7 @@ for i = 1:size(plot_type,2)
             z = eq.plasma.z;
             phi=eq.plasma.phi;
             tmp = eq.plasma.zeff;
-            cstring = 'Effective nuclear charge [-]';            
+            cstring = 'Effective nuclear charge [-]';
         case 'ba'
             plot(ax{i},eq.plasma.r, squeeze(eq.fields.br(:,z0_ind,1)),linestyle, 'DisplayName','B_r');
             plot(ax{i},eq.plasma.r, squeeze(eq.fields.bt(:,z0_ind,1)),linestyle, 'DisplayName','B_t');
@@ -1014,11 +1014,16 @@ for i = 1:size(plot_type,2)
                     name = [name,', scale=',num2str(fac)];
                 end
                 %cwav_mid=sim_data.cwav_mid(channel);
-                cwav_mid=mean(spec.lambda);%+(spec.lambda(2)-spec.lambda(1));
+                %cwav_mid=mean(spec.lambda);%+(spec.lambda(2)-spec.lambda(1));
+                cwav_mid = interp1(1:size(spec.lambda,1),spec.lambda,size(spec.lambda,1)/2.);
+
                 disp(['Cwav_mid_fidasim=', num2str(cwav_mid)]);
                 %cwav_mid=sim_data.cwav_mid(channel);
                 %cwav_mid = interp1(1:size(spec.lambda,1),spec.lambda,size(spec.lambda,1)/2.)-(spec.lambda(2)-spec.lambda(1))/2.;
-                instfu = box_gauss_funct(spec.lambda,0.,1.,cwav_mid,sim_data.instfu_gamma,sim_data.instfu_box_nm);
+                % We need to flip the kernel to do the same thing as
+                % fplot...
+                instfu = flipud(box_gauss_funct(spec.lambda,0.,1.,cwav_mid,sim_data.instfu_gamma,sim_data.instfu_box_nm));
+
                 plot(spec.lambda,conv(specr(:,channel),instfu(:,channel),'same'), 'DisplayName', ['Spectrum - ' name] );
                 %plot(spec.lambda,specr(:,channel), 'DisplayName', ['Spectrum no instfu - ' name] );
                 %plot(spec.lambda,specr(:,channel), 'DisplayName', ['Spectrum - ' name] );
