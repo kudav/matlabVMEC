@@ -1068,12 +1068,11 @@ for i = 1:size(plot_type,2)
             %legend(ax{i},'Interpreter','none','Location','northeast');
         case 'los3d'
             vec = [0, 0, -1];
-            rotation = 0;% 67.5;
             lens = rotate_points(geom.spec.lens,vec,deg2rad(rotation));
             axi = rotate_points(geom.spec.axis,vec,deg2rad(rotation));
             los = [lens, lens + axi.*max(sqrt(sum(lens(channel,1:2).^2,2)))*length];
             los = reshape(los,geom.spec.nchan,3,2);
-            h=plot3(ax{i},squeeze(los(channel,1,:))'*fac,squeeze(los(channel,2,:))'*fac,squeeze(los(channel,3,:))'*fac,linestyle);
+            plot3(ax{i},squeeze(los(channel,1,:))'*fac,squeeze(los(channel,2,:))'*fac,squeeze(los(channel,3,:))'*fac,linestyle);
             src = rotate_points(geom.nbi.src,vec,deg2rad(rotation));
             axi_nbi = rotate_points(geom.nbi.axis,vec,deg2rad(rotation));
             los_nbi = [src, src + axi_nbi.*length.*sqrt(sum(src(1:2).^2))];
@@ -1088,13 +1087,8 @@ for i = 1:size(plot_type,2)
                 input.xmax input.ymin input.zmax;...
                 input.xmax input.ymax input.zmax;...
                 input.xmin input.ymax input.zmax];
-            tmp=coords(:,2);
-            coords(:,2)=coords(:,1);
-            coords(:,1)=tmp;
-            coords= uvw_to_xyz(input.alpha, input.beta, input.gamma, coords, input.origin);
-            tmp=coords(:,2);
-            coords(:,2)=coords(:,1);
-            coords(:,1)=tmp;
+            %UVW Corrdinates are Machine coordinates
+            coords= xyz_to_uvw(input.alpha, input.beta, input.gamma, coords, input.origin);
             faces = [1 2 3 4 1;
                 1 2 6 5 1;
                 2 3 7 6 2;
@@ -1104,27 +1098,35 @@ for i = 1:size(plot_type,2)
             hold on;
             ha = patch('vertices',coords,'faces',faces);
             set(ha,'FaceColor','red', 'facealpha', 0.1);
-            plot3(coords(:,1),coords(:,2),coords(:,3),'.')
-            
+            plot3(coords(:,1),coords(:,2),coords(:,3),'.','DisplayName','Edge Points')
+            plot3(input.origin(1),input.origin(2),input.origin(3),'+','DisplayName','Beam Grid Origin')
+            if eq.fields.nphi==1
+                eq.fields.phi=0:0.2:2*pi;
+            end
             [r,phi,z]=ndgrid([eq.fields.r(1),eq.fields.r(end)],eq.fields.phi,[eq.fields.z(1),eq.fields.z(end)]);
             x=r.*cos(phi);
             y=r.*sin(phi);
             k=boundary(x(:),y(:),z(:));
             trisurf(k,x,y,z,'Facecolor','red','EdgeColor','none','FaceAlpha',0.1)
-            dphi=eq.fields.phi(2)-eq.fields.phi(1);
-            dr=(eq.fields.r(2)-eq.fields.r(1))*fac;
-            dz=(eq.fields.z(2)-eq.fields.z(1))*fac;
-            [r,phi,z_fida] = ndgrid(eq.fields.r*fac+dr/2,eq.fields.phi+dphi/2,eq.fields.z*fac+dz/2);
-            x_fida=r.*cos(phi);
-            y_fida=r.*sin(phi);
-            tmp=permute(eq.plasma.dene,[1 3 2]);
-            N=scatteredInterpolant(x_fida(:),y_fida(:),z_fida(:),tmp(:),'linear','none');
-            xg=linspace(min(x_fida,[],'all'),max(x_fida,[],'all'),51);
-            yg=linspace(min(y_fida,[],'all'),max(y_fida,[],'all'),52);
-            zg=linspace(min(z_fida,[],'all'),max(z_fida,[],'all'),53);
-            [x_dist,y_dist,z_dist] = meshgrid(xg,yg,zg);
-            dene=N(x_dist,y_dist,z_dist);
-            isosurface(x_dist,y_dist,z_dist,dene,1e13);
+            if lsep
+                dphi=eq.fields.phi(2)-eq.fields.phi(1);
+                dr=(eq.fields.r(2)-eq.fields.r(1))*fac;
+                dz=(eq.fields.z(2)-eq.fields.z(1))*fac;
+                [r,phi,z_fida] = ndgrid(eq.fields.r*fac+dr/2,eq.fields.phi+dphi/2,eq.fields.z*fac+dz/2);
+                x_fida=r.*cos(phi);
+                y_fida=r.*sin(phi);
+                tmp=permute(eq.plasma.dene,[1 3 2]);
+                if eq.fields.nphi==1
+                    tmp=repmat(tmp,1,numel(eq.fields.phi),1);
+                end
+                N=scatteredInterpolant(x_fida(:),y_fida(:),z_fida(:),tmp(:),'linear','none');
+                xg=linspace(min(x_fida,[],'all'),max(x_fida,[],'all'),51);
+                yg=linspace(min(y_fida,[],'all'),max(y_fida,[],'all'),52);
+                zg=linspace(min(z_fida,[],'all'),max(z_fida,[],'all'),53);
+                [x_dist,y_dist,z_dist] = meshgrid(xg,yg,zg);
+                dene=N(x_dist,y_dist,z_dist);
+                isosurface(x_dist,y_dist,z_dist,dene,6e13);
+            end
             xlabel('X [cm]')
             ylabel('Y [cm]')
             zlabel('Z [cm]')
@@ -1137,8 +1139,6 @@ for i = 1:size(plot_type,2)
            % rotate3d on;
         case 'lostor'
             vec = [0, 0, -1];
-            %lens =geom.spec.lens';
-            %axi = (geom.spec.lens + geom.spec.axis.*max(geom.spec.radius)*1.1)';
             lens = rotate_points(geom.spec.lens',vec,deg2rad(rotation))'; %AUG: 67.5
             axi = rotate_points((geom.spec.lens + geom.spec.axis.*max(geom.spec.radius)*length)',vec,deg2rad(rotation))';
             los = [lens, axi];
@@ -1396,12 +1396,8 @@ for i = 1:size(plot_type,2)
         end
         exportgraphics(ax{i}.Parent,[sname,'.png'],'Resolution',600);
     end
-
 end
-
 end
-
-
 
 
 function F = box_gauss_funct(X,A,B,C,D,E) % From /afs/ipp/home/s/sprd/XXX_DIAG/LIB
@@ -1416,23 +1412,35 @@ F = F./sum(F,1);
 F(F<1e-5) = 0;
 end
 
-
-%
-% function [xyz] = uvw_to_xyz(alpha, beta, gamma, uvw, origin) % From uvw_to_xyz.pro (D3D FIDASIM)
-% sa = sin(alpha); ca = cos(alpha);
-% sb = sin(beta) ; cb = cos(beta);
-% sg = sin(gamma) ; cg = cos(gamma);
-%
-% R = zeros(3);
-% R(1,1) = ca*cb ; R(2,1) = ca*sb*sg - cg*sa ; R(3,1) = sa*sg + ca*cg*sb;
-% R(1,2) = cb*sa ; R(2,2) = ca*cg + sa*sb*sg ; R(3,2) = cg*sa*sb - ca*sg;
-% R(1,3)= -sb   ; R(2,3) = cb*sg            ; R(3,3)= cb*cg;
-%
-% uvw_shifted = uvw-repmat(origin,size(uvw,1),1);
-% xyz = uvw_shifted*R;
-% end
-
 %Functions converted from D3D FIDASIM idl routines:
+
+
+function xyz = xyz_to_uvw(alpha, beta, gamma, xyz, origin)
+% Express non-rotated coordinate 'uvw' in rotated 'xyz' coordinates
+% Arguments:
+%     alpha: Rotation angle about z [radians]
+%     beta: Rotation angle about y' [radians]
+%     gamma: Rotation angle about x" [radians]
+%     uvw: Point in rotated coordinate system
+% Keyword Arguments:
+%     origin: Origin of rotated coordinate system in non-rotated (uvw) coordinates.
+
+if nargin < 5
+    origin = [0.0, 0.0, 0.0];
+end
+
+s = size(xyz);
+if numel(s) ~= 2
+    s = [s, 1];
+end
+
+
+R = tb_zyx(alpha, beta, gamma);
+
+xyz = R * xyz.';
+
+xyz = xyz.'+repmat(origin, s(1), 1);
+end
 
 function xyz = uvw_to_xyz(alpha, beta, gamma, uvw, origin)
 % Express non-rotated coordinate 'uvw' in rotated 'xyz' coordinates
@@ -1485,10 +1493,6 @@ R(3, 1) = -sb;     R(3, 2) = cb * sg;              R(3, 3) = cb * cg;
 % If you want to convert the result to single precision (float)
 % R = single(R);
 end
-
-
-
-
 
 function intersections = calculateIntersections(lens, axis, phi)
 % numLines = size(lens, 2);
