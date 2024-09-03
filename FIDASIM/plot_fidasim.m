@@ -166,7 +166,7 @@ if nargin > 1
             case {'overview','profiles','profiles_rho',...
                     'ba','br2d','bt2d','bz2d',...
                     'brtor','bttor','bztor','q2d',...
-                    'te2d','ne2d','ti2d', 'vt2d'}
+                    'te2d','ne2d','ti2d', 'vt2d','zeff2d'}
                 plot_type{end+1}=varargin{i}; %Make multiple plots possible
                 leq = 1;
                 if numel(varargin)>i
@@ -191,6 +191,10 @@ if nargin > 1
                         index_in = varargin{i};
                     end
                 end
+            case 'vflow2d'
+                ldist=1;
+                leq=1;
+                linput=1;
             case {'lcfs','sep','separatrix'}
                 lsep=1;
                 leq=1;
@@ -596,6 +600,9 @@ for i = 1:size(plot_type,2)
             %     exportgraphics(ax{i}.Parent,[sname,'.png'],'Resolution',600);
             % end
             %return
+        case 'vflow2d'
+            disp('Testing!')
+            trapz(dist.energy,dist.f.*dist.energy./,1)         
         case 'profiles'
             yyaxis(ax{i},'left')
             plot(ax{i},eq.plasma.r, squeeze(eq.plasma.te(:,z0_ind,1)), 'DisplayName',['T_e - ' name] );
@@ -644,6 +651,12 @@ for i = 1:size(plot_type,2)
             phi=eq.plasma.phi;
             tmp = eq.plasma.vt;
             cstring = 'Toroidal Rotation [cm/s]';
+        case 'zeff2d'
+            r = eq.plasma.r;
+            z = eq.plasma.z;
+            phi=eq.plasma.phi;
+            tmp = eq.plasma.zeff;
+            cstring = 'Effective nuclear charge [-]';            
         case 'ba'
             plot(ax{i},eq.plasma.r, squeeze(eq.fields.br(:,z0_ind,1)),linestyle, 'DisplayName','B_r');
             plot(ax{i},eq.plasma.r, squeeze(eq.fields.bt(:,z0_ind,1)),linestyle, 'DisplayName','B_t');

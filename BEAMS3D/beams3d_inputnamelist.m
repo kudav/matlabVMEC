@@ -112,6 +112,41 @@ for i=1:numel(rho3)
     mu =[mu 0.5.*mass.*(V.*cosd(pitch)).^2./(pchip(s,btemp,rhot.*rhot).*ones(1,npitch))];
 end
 
+% Define the output file
+outputFile = 'output.txt';
+
+% Open the file for writing
+fileID = fopen(outputFile, 'w');
+
+% Write values to the file
+fprintf(fileID, '&BEAMS3D_INPUT\n');
+
+
+fprintf(fileID, '  R_START_IN =');
+fprintf(fileID, ' %20.10E', r);  % Write each element of the array on the same line
+fprintf(fileID, '\n');
+
+fprintf(fileID, '  Z_START_IN =');
+fprintf(fileID, ' %20.10E', z);  % Write each element of the array on the same line
+fprintf(fileID, '\n');
+
+fprintf(fileID, '  PHI_START_IN =');
+fprintf(fileID, ' %20.10E', phi);  % Write each element of the array on the same line
+fprintf(fileID, '\n');
+
+fprintf(fileID, '  VLL_START_IN =');
+fprintf(fileID, ' %20.10E', vll);  % Write each element of the array on the same line
+fprintf(fileID, '\n');
+
+fprintf(fileID, '  MU_START_IN =');
+fprintf(fileID, ' %20.10E', mu);  % Write each element of the array on the same line
+fprintf(fileID, '\n');
+fprintf(fileID, '/\n');
+
+% Close the file
+fclose(fileID);
+
+
 % Output values to screen
 disp(['&BEAMS3D_INPUT']);
 disp(['  NR = 128']);
@@ -160,7 +195,7 @@ if lplots
         set(gca,'FontSize',24);
         xlabel('R [m]');
         ylabel('Z [m]');
-        title(['BEASM3D Starting Points (\zeta=' num2str(rad2deg(zeta(i)),'%d') '°)']);
+        title(['BEASM3D Starting Points (\zeta=' num2str(rad2deg(zeta(i)),'%d') ')']);
         n1=n2+1;
         n2=n2+nstep;
     end
