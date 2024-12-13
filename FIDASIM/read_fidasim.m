@@ -78,15 +78,28 @@ if isfile(nml_name)
             input.(fields{i}) = strrep(currentValue, '%%FIDASIM_PATH%%NUMBER', runid(1:2));
         end
     end
-    runid=input.runid;
+    
     %This ignores the full path and searches for the files in the current
     %directory
     dist_name=splitfn(input.distribution_file);
+
     eq_name=splitfn(input.equilibrium_file);
     geom_name=splitfn(input.geometry_file);
     neut_name=splitfn(input.neutrals_file);
     fidasim_out.input=input;
 
+if ~isfile(dist_name)
+    dist_name = [runid, '_distribution.h5'];
+end
+if ~isfile(eq_name)
+    eq_name = [runid,'_equilibrium.h5'];
+end
+if ~isfile(geom_name)
+    geom_name = [runid,'_geometry.h5'];
+end
+if ~isfile(neut_name)
+     neut_name = [runid, '_neutrals.h5'];
+end
 else
     disp('Could not find input namelist, using defaults!')
     dist_name = [runid, '_distribution.h5'];
@@ -94,13 +107,15 @@ else
     neut_name = [runid, '_neutrals.h5'];
     geom_name = [runid,'_geometry.h5'];
 end
-
+%runid=input.runid;
 
 birth_name = [runid,'_birth.h5'];
 weight_name = [runid,'_fida_weights.h5'];
 spec_name = [runid,'_spectra.h5'];
 
-fidasim_out.dist_name=dist_name;
+
+
+fidasim_out.dist_name=dist_name;    
 fidasim_out.eq_name=eq_name;
 fidasim_out.neut_name=neut_name;
 fidasim_out.geom_name=geom_name;
