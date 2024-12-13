@@ -37,6 +37,8 @@ maxphi=max(in_data.phiaxis);
 if ~strcmp(in_data.datatype,'FIELDLINES')
     dRdphi = r.*in_data.B_R ./ in_data.B_PHI;
     dZdphi = r.*in_data.B_Z ./ in_data.B_PHI;
+    dRdphi(in_data.B_PHI==0)=0;
+    dZdphi(in_data.B_PHI==0)=0;
 else
     dRdphi=in_data.B_R;
     dZdphi=in_data.B_Z;
@@ -44,8 +46,8 @@ end
 
 
 %Setup derivatives
-dR_F = griddedInterpolant(r,phi,z,dRdphi,'cubic');
-dZ_F = griddedInterpolant(r,phi,z,dZdphi,'cubic');
+dR_F = griddedInterpolant(r,phi,z,dRdphi,'makima');
+dZ_F = griddedInterpolant(r,phi,z,dZdphi,'makima');
 
 
 %Function to be integrated (q is a vector of length 2n with n entries for R
@@ -66,17 +68,18 @@ dZ_F = griddedInterpolant(r,phi,z,dZdphi,'cubic');
 
     function [value,isterminal,direction] = events(phi,~)
         if numel(poinc_loc)==1
-            value = mod(phi-poinc_loc,maxphi)-pi;
+            value = mod(phi-poinc_loc,maxphi)-.1;%-.1 is to ensure a 0 crossing
             isterminal=0;
             direction=-1;
         else
-            value = arrayfun(@(p) mod(phi-p,maxphi), poinc_loc);
+            value = arrayfun(@(p) mod(phi-p,maxphi)-.1, poinc_loc);
             isterminal = zeros(size(poinc_loc)); % Do not stop integration
-            direction = -ones(size(poinc_loc)); % Detect crossings in a specific direction
+            direction = ones(size(poinc_loc)); % Detect crossings in a specific direction
         end
     end
 
-options = odeset('RelTol',1e-5,'Events',@events);
+%options = odeset('Reltol',1e-13,'AbsTol',1e-12,'Events',@events,'Stats','on');
+options = odeset('Reltol',1e-10,'AbsTol',1e-8,'Events',@events,'Stats','on');
 starts = reshape(start_loc,1,[]);
 [~,~,phie,ye,ie] = ode89(@f,[phi_extent(1) phi_extent(2)],starts,options);
 
