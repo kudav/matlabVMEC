@@ -47,6 +47,7 @@ function data = read_netcdf(filename,varargin)
 % Allow the user to pass some variables.
 flipdim=0;
 strip=0;
+write=0;
 netcdffound=[];
 maxlength=namelengthmax;
 if nargin>1
@@ -56,6 +57,8 @@ if nargin>1
                 flipdim=1;
             case 'strip'
                 strip=1;
+            case 'write'
+                write=1;
         end
     end
 end
@@ -86,6 +89,14 @@ catch read_netcdf_error
     disp(['  -message:    ' read_netcdf_error.message]);
     disp('      For information type:  help read_netcdf');
     return
+
+end
+
+if write
+    % Open File
+fid=fopen([filename '_names.txt'],'w');
+% Write Header
+fprintf(fid,'FILE: %s\n',filename);
 end
 % Get information on number of elements
 ndimen=netcdfdata.getDimensions.size;
@@ -97,6 +108,9 @@ if ngatts >0
     for i=0:ngatts-1
         att=netcdfdata.getGlobalAttributes.get(i);
         attname=char(att.getName);
+        if write
+            fprintf(fid,'Global Att: %s\n',attname);
+        end
         % Do some checking
         if ~isletter(attname(1))
             disp(['Error Attribute not read: ' attname '  Attributes must begin with a character.']);
@@ -195,12 +209,19 @@ if nvars >0
                 end
             end
         end
+        if write
+            fprintf(fid,'Variable: %s\n',varname);
+        end
         if natts > 0
             for j=0:natts-1
                 att=var.getAttributes.get(j);
                 attname=char(att.getName);
+
                 if strip, attname(~isstrprop(attname,'alphanum'))=''; end;
                 varattname=strcat(varname,'_',attname);
+                if write
+                    fprintf(fid,'\t %s: ',varattname);
+                end                
                 switch char(att.getDataType)
                     case 'int'
                         data.(varattname)=att.getNumericValue.intValue;
@@ -216,6 +237,9 @@ if nvars >0
                         data.(varattname)=att.getNumericValue.byteValue;
                     case 'String'
                         data.(varattname)=char(att.getStringValue);
+                        if write
+                            fprintf(fid,' %s\n',data.(varattname));
+                        end
                     otherwise
                         disp(['-----Error reading: ' varattname]);
                 end
