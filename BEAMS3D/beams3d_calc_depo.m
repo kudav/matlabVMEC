@@ -43,7 +43,7 @@ dVdrho = pchip(sqrt(s),2.*sqrt(s).*dVds,rho_out);
 % Define starting points
 dexs = 1;
 if beam_data.lbeam
-    dexs=2;
+    dexs=2;%Particle ionization locations
 end
 
 % Calc births

@@ -1,6 +1,6 @@
-function beams3d_inputnamelist(vmec_data,energy,pitch,rho,theta,zeta,varargin)
+function file=beams3d_inputnamelist(vmec_data,energy,pitch,rho,theta,zeta,varargin)
 %BEAMS3D_INPUTNAMELIST Creates an input namelist from VMEC run
-%   The BEASM3DINPUTNAMELIST function outputs to screen an BEASM3D input
+%   The BEASM3DINPUTNAMELIST function fileputs to screen an BEASM3D input
 %   namelist based on particle information and a VMEC run.  It takes as
 %   input a vmec_data data structure as returned by READ_VMEC.  Energy is
 %   specified in [eV], pitch in degrees, rho in r/a, theta in radian, and
@@ -8,7 +8,7 @@ function beams3d_inputnamelist(vmec_data,energy,pitch,rho,theta,zeta,varargin)
 %   (default), 'D', 'T', or 'He') and whether plots are requested 'plots'.
 %
 %   Example usage
-%       vmec_data=read_vmec('wout_test.nc');
+%       vmec_data=read_vmec('wfile_test.nc');
 %       energy = 55e3;
 %       pitch  = -85:5:85;
 %       rho    = [0.25 0.5 0.75];
@@ -23,16 +23,20 @@ function beams3d_inputnamelist(vmec_data,energy,pitch,rho,theta,zeta,varargin)
 % Defaults
 mass=[];
 charge=[];
+Beam=[];
+file={};
 Zatom=1;
 species_type='H';
 ec  = 1.60217662E-19; % electron charge [C]
 amu = 1.66053906660E-27; % Dalton [kg]
 lplots=0;
+lfile=0;
 
-if length(energy) >1
-    disp('At this time only one energy may be specified');
-    return;
-end
+
+% if length(energy) >1
+%     disp('At this time only one energy may be specified');
+%     return;
+% end
 
 if (nargin > 6)
     j=1;
@@ -42,6 +46,10 @@ if (nargin > 6)
                 species_type = varargin{j};
             case {'plots','plot'}
                 lplots=1;
+            case {'file'}
+                j=j+1;
+                file=varargin{j};
+                lfile=1;
         end
         j=j+1;
     end
@@ -79,10 +87,12 @@ npitch = length(pitch);
 nrho   = length(rho);
 ntheta = length(theta);
 nzeta  = length(zeta);
-[rho3, theta3, zeta3]=ndgrid(rho,theta,zeta);
+[rho3, theta3, zeta3,V3]=ndgrid(rho,theta,zeta,V);
 ntotal=numel(rho3);
 rho_lin = reshape(rho3,[1 ntotal]);
 theta_lin = reshape(theta3,[1 ntotal]);
+%V_lin = reshape(V3,[1 ntotal]);
+Beam3=repmat(permute(1:numel(V),[1 3 4 2]),[nrho, ntheta, nzeta, 1]);
 zeta_lin = reshape(zeta3,[1 ntotal])/vmec_data.nfp;
 
 % VMEC helpers
@@ -107,16 +117,17 @@ for i=1:numel(rho3)
     r=[r ones(1,npitch).*pchip(s,rtemp,rhot.*rhot)];
     z=[z ones(1,npitch).*pchip(s,ztemp,rhot.*rhot)];
     phi=[phi ones(1,npitch).*v];
-    vll=[vll V.*sind(pitch)];
-    vperp=[vperp V.*cosd(pitch)];
-    mu =[mu 0.5.*mass.*(V.*cosd(pitch)).^2./(pchip(s,btemp,rhot.*rhot).*ones(1,npitch))];
+    vll=[vll V3(i).*sind(pitch)];
+    vperp=[vperp V3(i).*cosd(pitch)];
+    mu =[mu 0.5.*mass.*(V3(i).*cosd(pitch)).^2./(pchip(s,btemp,rhot.*rhot).*ones(1,npitch))];
+    Beam=[Beam Beam3(i)];
 end
 
-% Define the output file
-outputFile = 'output.txt';
+% Define the fileput file
+fileputFile = 'fileput.txt';
 
 % Open the file for writing
-fileID = fopen(outputFile, 'w');
+fileID = fopen(fileputFile, 'w');
 
 % Write values to the file
 fprintf(fileID, '&BEAMS3D_INPUT\n');
@@ -147,7 +158,7 @@ fprintf(fileID, '/\n');
 fclose(fileID);
 
 
-% Output values to screen
+% fileput values to screen
 disp(['&BEAMS3D_INPUT']);
 disp(['  NR = 128']);
 disp(['  NPHI = ' num2str(360/(2*vmec_data.nfp),'%d')]);
@@ -171,6 +182,7 @@ disp(['  MASS_IN = ' num2str(length(r),'%d') '*' num2str(mass,'%-20.10E')]);
 disp(['  CHARGE_IN = ' num2str(length(r),'%d') '*' num2str(charge,'%-20.10E')]);
 disp(['  ZATOM_IN = ' num2str(length(r),'%d') '*' num2str(Zatom,'%-3.1d')]);
 disp(['  T_END_IN = ' num2str(length(r),'%d') '*1.0E-3']);
+disp(['  DEX_BEAMS = ' num2str(Beam,' %d')]);
 disp(['/']);
 
 if lplots
@@ -208,6 +220,47 @@ if lplots
     xlabel('V_{parallel} x10^{6} [m/s]');
     ylabel('V_{perpendicular} x10^{6} [m/s]');
     title('BEAMS3D Starting Points Pitch');
+end
+
+if lfile
+    file.lbeam=1;
+    file.ldepo=1;
+    file.nparticles=length(r);
+    file.Beam=Beam;
+    file.mass=ones(1,file.nparticles)'*mass;
+    file.charge=ones(1,file.nparticles)'*ec;
+    file.Zatom=ones(1,file.nparticles)';
+    file.Weight=ones(1,file.nparticles)';
+    file.end_state=zeros(1,file.nparticles)';
+    %this is for beams3d to detect an old deposition run, should not have an impact for reasonable particle numbers
+    file.end_state(1)=3;
+    file.R_lines=zeros(file.npoinc+1,file.nparticles);
+    file.PHI_lines=zeros(file.npoinc+1,file.nparticles);
+    file.Z_lines=zeros(file.npoinc+1,file.nparticles);
+    file.vll_lines=zeros(file.npoinc+1,file.nparticles);
+    file.neut_lines=zeros(file.npoinc+1,file.nparticles);
+    file.moment_lines=zeros(file.npoinc+1,file.nparticles);
+    file.S_lines=ones(file.npoinc+1,file.nparticles)*1.5;
+    file.B_lines=ones(file.npoinc+1,file.nparticles)*-1;
+    file.vr_lines=zeros(file.npoinc+1,file.nparticles);
+    file.vphi_lines=zeros(file.npoinc+1,file.nparticles);
+    file.vz_lines=zeros(file.npoinc+1,file.nparticles);
+
+
+    file.R_lines(3,:)=r;
+    file.Z_lines(3,:)=z;
+    file.PHI_lines(3,:)=phi;
+
+    file.S_lines(3,:)=interp2(file.raxis,file.zaxis,...
+        squeeze(file.S_ARR(:,1,:))',file.R_lines(3,:),file.Z_lines(3,:));
+
+    file.B_lines(3,:)=interp2(file.raxis,file.zaxis,...
+        squeeze(sqrt(file.B_R(:,1,:).^2 + file.B_PHI(:,1,:).^2 + file.B_Z(:,1,:).^2))',...
+        file.R_lines(3,:),file.Z_lines(3,:));
+
+    file.vll_lines(3,:)=vll;
+    file.moment_lines(3,:)=mu;
+
 end
 
 end

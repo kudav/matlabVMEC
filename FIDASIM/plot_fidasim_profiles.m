@@ -6,9 +6,11 @@ function plot_data = plot_fidasim_profiles(filename,in_data,varargin)
 %two functions.
 %
 % Example usage
-%      [~,in_data] = get_bes_fida_aug_data(filename,'t_point',3.5,'fidabes');
-%      plot_fidasim_profiles(filename,in_data,'X);
+%      [~,in_data] = get_bes_fida_aug_data(filename,in_data,'fidabes');
+%      plot_fidasim_profiles(filename,in_data,'X');
 %      !!! 'X' can be 'fida', 'bes', or 'fidabes'
+%      plot_fidasim_profiles(filename,_,'spec_bes'); %Forces calculating BES from
+%      total spectrum, not from full energy component
 %
 % Miscellaneous Arguments
 %      plot_fidasim(runid,'mean'); %Apply moving mean to spectrum
@@ -17,12 +19,22 @@ function plot_data = plot_fidasim_profiles(filename,in_data,varargin)
 %      plot_fidasim(runid,'name', 'test'); %ID Name for legend
 %      plot_fidasim(runid,'fac', 1.0); %Scaling factor
 %
-bg_range=in_data.bg_range;
+if isfield(in_data,'bg_range')
+    bg_range=in_data.bg_range;
+else
+    bg_range = [664.5, 666];
+end
+if isfield(in_data,'bes_range')
+    bes_range = in_data.bes_range;
+else
+    bes_range=[];
+end
+if isfield(in_data,'fida_range')
+    fida_range = in_data.fida_range;
+else
+    fida_range = [659.5, 660.5];
+end
 
-bes_range = in_data.bes_range;
-fida_range = in_data.fida_range;
-dispersion = in_data.dispersion;
-lambda_dat = in_data.lambda;
 if isfield(in_data,'dex')
     dex = in_data.dex;
 else
@@ -41,6 +53,7 @@ lmean = 0;
 lload_fidasim=0;
 lrho=0;
 leps=0;
+lspecbes=0;
 plot_type = {};
 linestyle = '+';
 fac = 1;
@@ -54,7 +67,8 @@ if nargin > 2
     i = 1;
     while i < nargin-1
         switch varargin{i}
-            case {'FIDA','BES','FIDABES','fida','bes','fidabes','bck'}
+            case {'FIDA','BES','FIDABES','fida','bes','fidabes','bck',...
+                    'fidaspec','fida_bck','bes_comp'}
                 plot_type{end+1}=varargin{i}; %Make multiple plots possible
             case 'mean'
                 lmean =1;
@@ -63,6 +77,8 @@ if nargin > 2
             case 'avg_frames'
                 i = i+1;
                 avg_frames = varargin{i};
+            case 'spec_bes'
+                lspecbes=1;
             case 'rho'
                 lrho=1;
                 i=i+1;
@@ -123,11 +139,12 @@ lambda =data.lambda;
 
 if isfield(data,'pfida')
     pfida=data.pfida;
+    disp('Passive FIDA in Spectrum!')
 else
     pfida=zeros(size(fida));
 end
 
-spec = full + half + third + halo + dcx + fida + pfida;% + brems;
+spec = full+ half + third + halo + dcx + fida + pfida;% + brems;
 
 
 
@@ -150,16 +167,18 @@ if lload_fidasim
     dex=channel;
 end
 
-
+if isfield(in_data,'instfu_gamma')
 cwav_mid=mean(lambda);
-if ~lload_fidasim
-instfu = box_gauss_funct(lambda,0.,1.,cwav_mid,in_data.instfu_gamma,in_data.instfu_box_nm);
+%cwav_mid = interp1(1:size(lambda,1),lambda,size(lambda,1)/2.);
+%if ~lload_fidasim
+%Flipud is necessary to emulate fplot.pro behavior from FIDASIM4
+instfu = flipud(box_gauss_funct(lambda,0.,1.,cwav_mid,in_data.instfu_gamma,in_data.instfu_box_nm));
 disp(['Applying Instrument function to FIDASIM data: ', filename]);
-if numel(in_data.instfu_gamma)==numel(in_data.names)
+if size(spec,2)~=size(instfu,2)
     disp('Careful! Only applying Instrument function to known LOS!')
 end
 for i = 1:size(instfu,2)
-    spec(:,i) = conv(spec(:,i),instfu(:,i),'same');    
+    spec(:,i) = conv(spec(:,i),instfu(:,i),'same');
 end
 end
 if lmean == 1
@@ -175,21 +194,49 @@ dispersion_tmp = repmat(dispersion_tmp,1,size(spec,2));
 bg_dex = (lambda > bg_range(1)) & (lambda < bg_range(2));
 bg = sum(brems.*dispersion_tmp.*bg_dex,1,'omitnan')./sum(dispersion_tmp.*bg_dex,1,'omitnan');
 
-if size(bes_range,1)==numel(bg)&&~lload_fidasim
-bes_dex = (lambda > repmat(bes_range(:,1)',size(lambda,1),1)) & (lambda < repmat(bes_range(:,2)',size(lambda,1),1));
-bes = sum(spec.*dispersion_tmp.*bes_dex,1,'omitnan');
+if (size(bes_range,1)==numel(bg) && ~lload_fidasim) | lspecbes
+    bes_dex = (lambda > repmat(bes_range(:,1)',size(lambda,1),1)) & (lambda < repmat(bes_range(:,2)',size(lambda,1),1));
+    bes_dex=[bes_dex,zeros(size(bes_dex,1),numel(bg)-size(bes_dex,2))];
+    % bes = sum(spec.*dispersion_tmp.*bes_dex,1,'omitnan');
+    disp('BES from full FIDASIM spectrum!')
+    bes=trapz(lambda,spec.*bes_dex);
 else
     bes = sum(full.*dispersion_tmp,1,'omitnan')/3;%Approximate BES by full Beam component
+    if isempty(bes_range)
+        m=size(full',2);
+        [val,loc] = max(  fliplr(logical(full')),  [],2);
+        k=m+1-loc;
+        k(val==0)=m;
+        [val,loc] = max(  (logical(full')),  [],2);
+        k2=m+1-loc;
+        k2(val==0)=m;
+        bes_range=[lambda(k2),lambda(k)];
+    end
 end
 
 fida_dex = (lambda > fida_range(1)) & (lambda < fida_range(2));
 fida = sum(spec.*dispersion_tmp.*fida_dex,1,'omitnan');
+
+if fac~=1
+    dispname = ['', name, ', scaling factor: ' num2str(fac)];
+else
+    dispname = ['', name];
+end
+
 
 for i = 1:size(plot_type,2)
     if i>numel(ax)
         figure;
         ax{i} = gca;
         hold on;
+    end
+    if lrho==1 && isfield(geom.spec,'rho')
+        R_plt=geom.spec.rho(dex);
+        xlabel(ax{i},'\rho_{tor} [-]')
+        xlim([0 1])
+    else
+        R_plt=R(dex);
+        xlabel(ax{i},'R [cm]')
     end
     switch lower(plot_type{i})
         case 'bck'
@@ -202,28 +249,35 @@ for i = 1:size(plot_type,2)
             tmp = fida(dex);
             ystr = 'FIDA';
         case 'fidabes'
-            tmp = fida(dex)./bes(dex);
+            tmp = fida(dex)./bes(dex).*abs(diff(bes_range(dex,:),1,2)'./diff(fida_range));
             ystr = 'FIDA/BES';
-            % if lsave
-            %     legend(ax{i},'Location','southwest');
-            % end
+        case 'fida_bck'
+            tmp = fida(dex)./bg(dex).*diff(bg_range)./diff(fida_range);
+            ystr = 'FIDA/BACKGROUND';
+        case 'fidaspec'
+            plot(ax{i},lambda(fida_dex), spec(fida_dex,dex),linestyle,'DisplayName',dispname, 'LineWidth',2.0);
+            xlabel(ax{i},'Wavelength [nm]')
+            ylabel(ax{i},'Intensity [Ph/(s nm m^2 sr)]')
+            continue
+        case 'bes_comp'
+            %spec = full+ half + third + halo + dcx + fida + pfida;% + brems;
+            bestmp(:,1)=  sum(full.*dispersion_tmp.*bes_dex,1,'omitnan');
+            bestmp(:,2)=  sum(half.*dispersion_tmp.*bes_dex,1,'omitnan');
+            bestmp(:,3)=  sum(third.*dispersion_tmp.*bes_dex,1,'omitnan');
+            bestmp(:,4)=  sum((halo+dcx).*dispersion_tmp.*bes_dex,1,'omitnan');
+            bestmp(:,5)=  sum(fida.*dispersion_tmp.*bes_dex,1,'omitnan');
+            bestmp(:,6)=  sum(pfida.*dispersion_tmp.*bes_dex,1,'omitnan');
+            bar(ax{i},R_plt,bestmp(dex,:),'stacked');
+            continue
+
 
     end
 
     if fac~=1
         tmp = tmp.*fac;
-        dispname = ['', name, ', scaling factor: ' num2str(fac)];
-    else
-        dispname = ['', name];
     end
-    if lrho==1 && isfield(geom.spec,'rho')
-        plot(ax{i},geom.spec.rho(dex), tmp,linestyle,'DisplayName',dispname, 'LineWidth',2.0);
-        xlabel(ax{i},'\rho_{tor} [-]')   
-        xlim([0 1])
-    else
-        plot(ax{i},R(dex), tmp,linestyle,'DisplayName',dispname, 'LineWidth',2.0);
-        xlabel(ax{i},'R [cm]')
-    end
+
+    plot(ax{i},R_plt, tmp,linestyle,'DisplayName',dispname, 'LineWidth',2.0);
     ylabel(ax{i},ystr)
     if lsave
         sname = [name, '_', plot_type{i}];
@@ -238,8 +292,11 @@ for i = 1:size(plot_type,2)
     end
 end
 plot_data.R = R;
+plot_data.R_plt = R_plt;
+plot_data.bg = bg;
 plot_data.bes = bes;
 plot_data.fida = fida;
+plot_data.fidabes = fida./bes;
 plot_data.spec = spec;
 plot_data.lambda=lambda;
 plot_data.ax=ax;
@@ -248,14 +305,14 @@ plot_data.dex = dex;
 end
 
 
-function F = box_gauss_funct(X,A,B,C,D,E) % From /afs/ipp/home/s/sprd/XXX_DIAG/LIB
-gam   = double(D);
-width = double(E);
-rl    = abs(0.5d0*width./gam);
-Z     = abs((double(X)-double(C))./gam);
-F     = double(B)*(0.5d0./width.*(erf((Z+rl)) - erf((Z-rl))))+double(A);
-
-% Normalization and cutoff
-F = F./sum(F,1);
-F(F<1e-5) = 0;
-end
+% function F = box_gauss_funct(X,A,B,C,D,E) % From /afs/ipp/home/s/sprd/XXX_DIAG/LIB
+% gam   = double(D);
+% width = double(E);
+% rl    = abs(0.5d0*width./gam);
+% Z     = abs((double(X)-double(C))./gam);
+% F     = double(B)*(0.5d0./width.*(erf(Z+rl) - erf(Z-rl)))+double(A);
+%
+% % Normalization and cutoff
+% %F = F./sum(F,1);
+% %F(F<1e-5) = 0;
+% end

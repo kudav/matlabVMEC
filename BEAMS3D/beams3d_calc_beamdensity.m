@@ -1,4 +1,4 @@
-function beam_density = beams3d_calc_beamdensity(beam_data)
+function beam_density = beams3d_calc_beamdensity(beam_data,beamdex)
 %BEAMS3D_CALC_BEAMDENSITY calculates the spatial neutral beam density
 %profiles given a BEAMS3D run with deposition. The beam density is
 %calculated on the normal cylindrical background grid. For now, only one
@@ -10,24 +10,27 @@ function beam_density = beams3d_calc_beamdensity(beam_data)
 %
 % Maintained by: David Kulla (david.kulla@ipp.mpg.de)
 % Version:       1.00
-
+if isempty(beamdex)
+    beamdex=1:beam_data.nbeams;
+end
 nl=128;
 norm_nl=ones(nl,1)/nl;
 s=linspace(0,1,nl);
 rmax=beam_data.raxis(end);
 
+dex=ismember(beam_data.Beam,beamdex);
+dex=dex&beam_data.end_state~=3&beam_data.end_state~=4;
+%dex=beam_data.end_state~=4; %All particles entering the vessel should contribute
 
-dex=beam_data.end_state~=3&beam_data.end_state~=4;
 r0=beam_data.R_lines(1,dex);
 phi0=beam_data.PHI_lines(1,dex);
 z0=beam_data.Z_lines(1,dex);
-
-
 r1=beam_data.R_lines(2,dex);
 phi1=beam_data.PHI_lines(2,dex);
 z1=beam_data.Z_lines(2,dex);
 
-%calculate phi and z for r0=rmax
+%calculate phi and z for r0=rmax, as we want the beam density within the
+%simulation grid
 smax=(rmax-r0)./(r1-r0);
 r0=r0+smax.*(r1-r0);
 z0=z0+smax.*(z1-z0);
@@ -40,9 +43,11 @@ x1 = r1.*cos(phi1);
 y1 = r1.*sin(phi1);
 %m  = beam_data.Beam;
 
+%Calculate length of track until ionization
 d  = sqrt((x1-x0).^2 + (y1-y0).^2 + (z1-z0).^2);
-denbeam = beam_data.Weight(dex)'.*d./beam_data.vll_lines(1,dex); % This is the total number of particles
-denp=norm_nl.*denbeam; %Distribute the weight over all points along the track
+% This is the total number of particles
+denbeam = beam_data.Weight(dex)'.*d./beam_data.vll_lines(1,dex); 
+denp=norm_nl.*denbeam; %Distribute the weight evenly over all points along the track (steady state)
 xl = x0 + s'.*(x1-x0);
 yl = y0 + s'.*(y1-y0);
 zl = z0 + s'.*(z1-z0);
