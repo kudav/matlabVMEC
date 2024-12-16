@@ -2193,6 +2193,7 @@ end
 if ~isfield(f,'iasym'), f.iasym=0; end
 % Now do the 2D array values
 % Need to handle odd/even differently
+f.ns=double(f.ns);
 ns1 = f.ns-1;
 % Do main points
 % This is the Samantha Lazerson bugfix 2023.01.29
