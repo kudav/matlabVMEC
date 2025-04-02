@@ -1284,7 +1284,7 @@ else
                 clabel='hits';
                 switch lower(plot_type{i})
                     case 'wall_heat_2d'
-                        val = sum(beam_data.wall_load(beamdex,:))';
+                        val = sum(beam_data.wall_load(beamdex,:),1)';
                         if max(val) > 1E6
                             factor = 1E6;
                             clabel = 'MW/m^2';
@@ -1296,7 +1296,7 @@ else
                             clabel = 'W/m^2';
                         end
                     case 'wall_shine_2d'
-                        val = sum(beam_data.wall_shine(beamdex,:))';
+                        val = sum(beam_data.wall_shine(beamdex,:),1)';
                         if max(val) > 1E6
                             factor = 1E6;
                             clabel = 'MW/m^2';
