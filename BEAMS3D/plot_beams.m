@@ -1231,6 +1231,8 @@ else
                         val=sum(beam_data.wall_load(beamdex,:),1)';
                 end
                 output_args{1}=patch('Vertices',beam_data.wall_vertex,'Faces',beam_data.wall_faces,'FaceVertexCData',val,'LineStyle','none','CDataMapping','scaled','FaceColor','flat');
+                %Make colors more visible
+                set(output_args{1},'DiffuseStrength',1.0)
                 %Add keyboard movement
                 fig = gcf;
                 fig.KeyPressFcn = @ax_keyboard_control;

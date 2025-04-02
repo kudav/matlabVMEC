@@ -63,6 +63,9 @@ amu = 1.66053906660E-27; % Dalton [kg]
 
 n_fida=-1;
 input={};
+eq={};
+dist={};
+geom={};
 
 
 if ischar(file)
@@ -100,6 +103,8 @@ else
             vol2d=repmat(vol,[1 dist.nz dist.nphi]);
             n_fida = sum(dist.denf.*vol2d,'all');
         else
+            dphi=2*pi;
+            nphi=1;            
             n_fida = 2*pi*dr*dz*sum(dist.r.*sum(squeeze(dist.denf(:,:,1)),2)); %Axisymmetric only.
         end
 
@@ -149,6 +154,7 @@ lcontour=0;
 levels=2;
 linput=0;
 ltorint=0;
+zval=0.0;
 lintersection=0;
 sim_data = {};
 channel = 0;
@@ -258,6 +264,7 @@ if nargin > 1
                 plot_type{end+1}=varargin{i}; %Make multiple plots possible
                 %lspec = 1;
                 lgeom = 1;
+                linput=1;
                 i=i+1;
                 channel = varargin{i};
                 i=i+1;
@@ -316,6 +323,9 @@ if nargin > 1
             case 'style'
                 i = i+1;
                 linestyle = varargin{i};
+            case 'z'
+                i=i+1;
+                zval=varargin{i};
             otherwise
                 disp(['ERROR: Option ', varargin{i}, ' not found!']);
         end
@@ -351,10 +361,12 @@ if ~lloaded
             vol2d=repmat(vol,[1 dist.nz dist.nphi]);
             n_fida = sum(dist.denf.*vol2d,'all');
         else
+            dphi=2*pi;
+            nphi=1;
             n_fida = 2*pi*dr*dz*sum(dist.r.*sum(squeeze(dist.denf(:,:,1)),2)); %Axisymmetric only.
         end
 
-        [~,z0_ind]=min(abs(dist.z));
+        [~,z0_ind]=min(abs(dist.z-zval));
     end
     if leq
         if isfile(eq_name)
@@ -373,7 +385,7 @@ if ~lloaded
                 return
             end
         end
-        [~,z0_ind]=min(abs(eq.fields.z));
+        [~,z0_ind]=min(abs(eq.fields.z-zval));
     end
 
     if lweight
@@ -414,9 +426,9 @@ if ~lloaded
     end
 else
     if leq
-        [~,z0_ind]=min(abs(eq.fields.z));
+        [~,z0_ind]=min(abs(eq.fields.z-zval));
     elseif ldist
-        [~,z0_ind]=min(abs(dist.z));
+        [~,z0_ind]=min(abs(dist.z-zval));
     end
 end
 
@@ -653,6 +665,7 @@ for i = 1:size(plot_type,2)
             hold on
             plot(ax{i},eq.plasma.r, squeeze(eq.plasma.ti(:,z0_ind,1)), 'DisplayName',['T_i - ' name] );
             plot(ax{i},eq.plasma.r, squeeze(eq.plasma.zeff(:,z0_ind,1)), 'DisplayName',['Zeff [-] - ' name] );
+            plot(ax{i},eq.plasma.r, squeeze(eq.plasma.vt(:,z0_ind,1)/3e6), 'DisplayName',['Vtor [3e4m/s] - ' name] );
             ylabel(ax{i},'T [keV]')
             legend(ax{i},'Interpreter','none');
             yyaxis(ax{i},'right')
@@ -675,7 +688,7 @@ for i = 1:size(plot_type,2)
             r = eq.plasma.r;
             z = eq.plasma.z;
             phi=eq.plasma.phi;
-            tmp = eq.plasma.dene;
+            tmp = eq.plasma.dene;%.*double(eq.plasma.mask);
             cstring = 'Electron density [m^{-3}]';
         case 'te2d'
             r = eq.plasma.r;
@@ -766,8 +779,9 @@ for i = 1:size(plot_type,2)
             ylabel('Fast ion density [cm^{-3}]')
             %title(sprintf('FI density profile at z= %.2f',dist.z(z0_ind)))
         case 'fdenf'
-            if numel(index)==1
+            if numel(index_in)<=1
                 tmp = squeeze(trapz(dist.pitch,trapz(dist.energy,dist.f,1),2));
+                
             else
                 [~,e_min]=min(abs(dist.energy-index_in(1)));
                 [~,e_max]=min(abs(dist.energy-index_in(2)));
@@ -777,10 +791,12 @@ for i = 1:size(plot_type,2)
             end
             if fac == 1
                 plot(ax{i},dist.r, tmp(:,z0_ind,index),linestyle, 'DisplayName',name );
+                
                 %plot(ax{i},dist.r, movmean(tmp(:,z0_ind,1),15),linestyle, 'DisplayName',['Movmean Denf from f - ' name] );
             else
                 plot(ax{i},dist.r, fac*tmp(:,z0_ind,index),linestyle, 'DisplayName',[ name ', scaling factor: ' num2str(fac)]);
             end
+            disp(['z=',num2str(dist.z(z0_ind))])
             xlabel('R [m]')
             ylabel('Fast ion density [cm^{-3}]')
             %title('Fast ion density profile at z=0')
@@ -829,13 +845,13 @@ for i = 1:size(plot_type,2)
             tmp = (eq.fields.bt(:,:,1) .* a2d) ./ sqrt(eq.fields.bz(:,:,1).^2 + eq.fields.br(:,:,1).^2)./eq.fields.r2d;
             cstring = 'Safety factor [-]';
         case 'denftor'
-            r = eq.fields.r;
-            phi = eq.fields.phi;
+            r = dist.r;
+            phi = dist.phi;
             tmp = dist.denf;
             cstring = 'Fast ion density [cm^{-3}]';
         case 'fdenftor'
             r = dist.r;
-            phi = eq.fields.phi;
+            phi = dist.phi;
             z = dist.z;
             if numel(index_in)==1
                 tmp = squeeze(trapz(dist.pitch,trapz(dist.energy,dist.f,1),2));
@@ -1015,8 +1031,8 @@ for i = 1:size(plot_type,2)
                     name = [name,', scale=',num2str(fac)];
                 end
                 %cwav_mid=sim_data.cwav_mid(channel);
-                %cwav_mid=mean(spec.lambda);%+(spec.lambda(2)-spec.lambda(1));
-                cwav_mid = interp1(1:size(spec.lambda,1),spec.lambda,size(spec.lambda,1)/2.);
+                cwav_mid=mean(spec.lambda);%-(spec.lambda(2)-spec.lambda(1));
+                %cwav_mid = interp1(1:size(spec.lambda,1),spec.lambda,size(spec.lambda,1)/2.)-(spec.lambda(2)-spec.lambda(1));
 
                 disp(['Cwav_mid_fidasim=', num2str(cwav_mid)]);
                 %cwav_mid=sim_data.cwav_mid(channel);
@@ -1041,7 +1057,7 @@ for i = 1:size(plot_type,2)
                 %plot(spec.lambda, conv(spec.halo(:,channel)+spec.dcx(:,channel),instfu(:,channel),'same'),  'DisplayName',['Halo+DCX - ' name] ); %+spec.brems(:,channel)
                 %plot(spec.lambda, conv(spec.dcx(:,channel),instfu(:,channel),'same'),  'DisplayName',['DCX only - ' name] ); %+spec.brems(:,channel)
                 %fprintf('Halo Centered at %.3f nm\n', sum(spec.lambda.*conv(spec.halo(:,channel)+spec.dcx(:,channel),instfu(:,channel),'same'))./sum(conv(spec.halo(:,channel)+spec.dcx(:,channel),instfu(:,channel),'same')));
-                plot(spec.lambda, conv(spec.fida(:,channel),instfu(:,channel),'same'),  'DisplayName',['FIDA - ' name] );
+                %plot(spec.lambda, conv(spec.fida(:,channel),instfu(:,channel),'same'),  'DisplayName',['FIDA - ' name] );
             else
                 plot(spec.lambda,specr(:,channel),linestyle, 'DisplayName', ['Spectrum - ' name] );
                 if (isfield(spec,'pfida' ) && lpassive)
@@ -1068,37 +1084,81 @@ for i = 1:size(plot_type,2)
             %legend(ax{i},'Interpreter','none','Location','northeast');
         case 'los3d'
             vec = [0, 0, -1];
-            rotation = 0;% 67.5;
             lens = rotate_points(geom.spec.lens,vec,deg2rad(rotation));
             axi = rotate_points(geom.spec.axis,vec,deg2rad(rotation));
             los = [lens, lens + axi.*max(sqrt(sum(lens(channel,1:2).^2,2)))*length];
             los = reshape(los,geom.spec.nchan,3,2);
-            h=plot3(ax{i},squeeze(los(channel,1,:))'*fac,squeeze(los(channel,2,:))'*fac,squeeze(los(channel,3,:))'*fac,linestyle);
+            plot3(ax{i},squeeze(los(channel,1,:))'*fac,squeeze(los(channel,2,:))'*fac,squeeze(los(channel,3,:))'*fac,linestyle);
             src = rotate_points(geom.nbi.src,vec,deg2rad(rotation));
             axi_nbi = rotate_points(geom.nbi.axis,vec,deg2rad(rotation));
             los_nbi = [src, src + axi_nbi.*length.*sqrt(sum(src(1:2).^2))];
             los_nbi = reshape(los_nbi,3,2);
-            plot3(ax{i},squeeze(los_nbi(1,:))'*fac,squeeze(los_nbi(2,:))'*fac,squeeze(los_nbi(3,:))'*fac,'-r')
+            plot3(ax{i},squeeze(los_nbi(1,:))'*fac,squeeze(los_nbi(2,:))'*fac,squeeze(los_nbi(3,:))'*fac,'-r');
             plot3(ax{i},squeeze(los_nbi(1,1))'*fac,squeeze(los_nbi(2,1))'*fac,squeeze(los_nbi(3,1))'*fac,'+k');
-
-            %plot3(ax{i},[0, 1000*cos(5.8)]*fac,[0, 1000*sin(5.8)]*fac,[0,0],'g');
-            %plot3(ax{i},squeeze(geom.spec.closest_points(1,:))'*fac,squeeze(geom.spec.closest_points(2,:))'*fac,squeeze(geom.spec.closest_points(3,:))'*fac,'dk');
-            %intersections = calculateIntersections(geom.spec.lens, geom.spec.axis, 1.8);
-            %plot3(ax{i},intersections(1,:),intersections(2,:),intersections(3,:),'k.');
-            %sname = [file, '_', plot_type{i}];
+            if isfield(input,'xmin')
+            coords = [input.xmin input.ymin input.zmin;...
+                input.xmax input.ymin input.zmin;...
+                input.xmax input.ymax input.zmin;...
+                input.xmin input.ymax input.zmin;...
+                input.xmin input.ymin input.zmax;...
+                input.xmax input.ymin input.zmax;...
+                input.xmax input.ymax input.zmax;...
+                input.xmin input.ymax input.zmax];
+            %UVW Corrdinates are Machine coordinates
+            coords= xyz_to_uvw(input.alpha, input.beta, input.gamma, coords, input.origin);
+            faces = [1 2 3 4 1;
+                1 2 6 5 1;
+                2 3 7 6 2;
+                3 4 8 7 3;
+                4 1 5 8 4;
+                5 6 7 8 5];
+            hold on;
+            ha = patch('vertices',coords,'faces',faces);
+            set(ha,'FaceColor','red', 'facealpha', 0.1);
+            plot3(coords(:,1),coords(:,2),coords(:,3),'.','DisplayName','Edge Points')
+            plot3(input.origin(1),input.origin(2),input.origin(3),'+','DisplayName','Beam Grid Origin')
+            end
+            if isfield(eq,'fields')
+            if eq.fields.nphi==1
+                eq.fields.phi=0:0.2:2*pi;
+            end
+            [r,phi,z]=ndgrid([eq.fields.r(1),eq.fields.r(end)],eq.fields.phi,[eq.fields.z(1),eq.fields.z(end)]);
+            x=r.*cos(phi);
+            y=r.*sin(phi);
+            k=boundary(x(:),y(:),z(:));
+            trisurf(k,x,y,z,'Facecolor','red','EdgeColor','none','FaceAlpha',0.1)
+            if lsep
+                dphi=eq.fields.phi(2)-eq.fields.phi(1);
+                dr=(eq.fields.r(2)-eq.fields.r(1))*fac;
+                dz=(eq.fields.z(2)-eq.fields.z(1))*fac;
+                [r,phi,z_fida] = ndgrid(eq.fields.r*fac+dr/2,eq.fields.phi+dphi/2,eq.fields.z*fac+dz/2);
+                x_fida=r.*cos(phi);
+                y_fida=r.*sin(phi);
+                tmp=permute(eq.plasma.dene,[1 3 2]);
+                if eq.fields.nphi==1
+                    tmp=repmat(tmp,1,numel(eq.fields.phi),1);
+                end
+                N=scatteredInterpolant(x_fida(:),y_fida(:),z_fida(:),tmp(:),'linear','none');
+                xg=linspace(min(x_fida,[],'all'),max(x_fida,[],'all'),51);
+                yg=linspace(min(y_fida,[],'all'),max(y_fida,[],'all'),52);
+                zg=linspace(min(z_fida,[],'all'),max(z_fida,[],'all'),53);
+                [x_dist,y_dist,z_dist] = meshgrid(xg,yg,zg);
+                dene=N(x_dist,y_dist,z_dist);
+                isosurface(x_dist,y_dist,z_dist,dene,4e13);
+            end
+            end
             xlabel('X [cm]')
             ylabel('Y [cm]')
             zlabel('Z [cm]')
-            grid on
+            camlight left
+            %sname = [filename, '_', plot_type{i}];
             %writematrix(los_nbi,sname,linestyle);
             % set(h, {'DisplayName'}, cellstr(deblank(geom.spec.id(channel))))
             %legend(h,'Location','bestoutside');
-            axis equal
-            rotate3d on
+            %axis equal;
+           % rotate3d on;
         case 'lostor'
             vec = [0, 0, -1];
-            %lens =geom.spec.lens';
-            %axi = (geom.spec.lens + geom.spec.axis.*max(geom.spec.radius)*1.1)';
             lens = rotate_points(geom.spec.lens',vec,deg2rad(rotation))'; %AUG: 67.5
             axi = rotate_points((geom.spec.lens + geom.spec.axis.*max(geom.spec.radius)*length)',vec,deg2rad(rotation))';
             los = [lens, axi];
@@ -1211,7 +1271,11 @@ for i = 1:size(plot_type,2)
     %if numel(plot_type{i}) > 2
     if strcmp(plot_type{i}(end-1:end),'2d')
         if ltorint
+            if nphi>1
             tmp = trapz(dphi*nphi/(nphi-1),dist.r2d.*tmp,3);
+            else
+                tmp=dist.r2d.*tmp*2*pi;
+            end
             index=1;
             cstring(end-2)='2';%Denote area density
         end
@@ -1356,39 +1420,102 @@ for i = 1:size(plot_type,2)
         end
         exportgraphics(ax{i}.Parent,[sname,'.png'],'Resolution',600);
     end
-
+end
 end
 
+% 
+% function F = box_gauss_funct(X,A,B,C,D,E) % From /afs/ipp/home/s/sprd/XXX_DIAG/LIB
+% gam   = double(D);
+% width = double(E);
+% rl    = abs(0.5d0*width./gam);
+% Z     = abs((double(X)-double(C))./gam);
+% F     = double(B)*(0.5d0./width.*(erf((Z+rl)) - erf((Z-rl))))+double(A);
+% 
+% % Normalization and cutoff
+% F = F./sum(F,1);
+% F(F<1e-5) = 0;
+% end
+
+%Functions converted from D3D FIDASIM idl routines:
+
+
+function xyz = xyz_to_uvw(alpha, beta, gamma, xyz, origin)
+% Express non-rotated coordinate 'uvw' in rotated 'xyz' coordinates
+% Arguments:
+%     alpha: Rotation angle about z [radians]
+%     beta: Rotation angle about y' [radians]
+%     gamma: Rotation angle about x" [radians]
+%     uvw: Point in rotated coordinate system
+% Keyword Arguments:
+%     origin: Origin of rotated coordinate system in non-rotated (uvw) coordinates.
+
+if nargin < 5
+    origin = [0.0, 0.0, 0.0];
+end
+
+s = size(xyz);
+if numel(s) ~= 2
+    s = [s, 1];
 end
 
 
+R = tb_zyx(alpha, beta, gamma);
 
+xyz = R * xyz.';
 
-function F = box_gauss_funct(X,A,B,C,D,E) % From /afs/ipp/home/s/sprd/XXX_DIAG/LIB
-gam   = double(D);
-width = double(E);
-rl    = abs(0.5d0*width./gam);
-Z     = abs((double(X)-double(C))./gam);
-F     = double(B)*(0.5d0./width.*(erf((Z+rl)) - erf((Z-rl))))+double(A);
-
-% Normalization and cutoff
-F = F./sum(F,1);
-F(F<1e-5) = 0;
+xyz = xyz.'+repmat(origin, s(1), 1);
 end
 
+function xyz = uvw_to_xyz(alpha, beta, gamma, uvw, origin)
+% Express non-rotated coordinate 'uvw' in rotated 'xyz' coordinates
+% Arguments:
+%     alpha: Rotation angle about z [radians]
+%     beta: Rotation angle about y' [radians]
+%     gamma: Rotation angle about x" [radians]
+%     uvw: Point in rotated coordinate system
+% Keyword Arguments:
+%     origin: Origin of rotated coordinate system in non-rotated (uvw) coordinates.
 
-function [xyz] = uvw_to_xyz(alpha, beta, gamma, uvw, origin) % From uvw_to_xyz.pro (D3D FIDASIM)
-sa = sin(alpha); ca = cos(alpha);
-sb = sin(beta) ; cb = cos(beta);
-sg = sin(gamma) ; cg = cos(gamma);
+if nargin < 5
+    origin = [0.0, 0.0, 0.0];
+end
 
-R = zeros(3);
-R(1,1) = ca*cb ; R(2,1) = ca*sb*sg - cg*sa ; R(3,1) = sa*sg + ca*cg*sb;
-R(1,2) = cb*sa ; R(2,2) = ca*cg + sa*sb*sg ; R(3,2) = cg*sa*sb - ca*sg;
-R(1,3)= -sb   ; R(2,3) = cb*sg            ; R(3,3)= cb*cg;
+s = size(uvw);
+if numel(s) ~= 2
+    s = [s, 1];
+end
 
-uvw_shifted = uvw-repmat(origin,size(uvw,1),1);
-xyz = uvw_shifted*R;
+uvw_shifted = uvw - repmat(origin, s(1), 1);
+
+R = tb_zyx(alpha, beta, gamma).';
+
+xyz = R * uvw_shifted.';
+
+xyz = xyz.';
+end
+function R = tb_zyx(a, b, g)
+% Calculates Tait-Bryan z-y'-x" active rotation matrix given rotation angles `alpha`,`beta`,`gamma` in radians
+% Arguments:
+%     a: rotation angle about z [radians]
+%     b: rotation angle about y' [radians]
+%     g: rotation angle about x" [radians]
+% Return Value:
+%     Rotation Matrix
+
+sa = sin(a); ca = cos(a);
+sb = sin(b); cb = cos(b);
+sg = sin(g); cg = cos(g);
+
+R = zeros(3, 3);
+R(1, 1) = ca * cb; R(1, 2) = ca * sb * sg - cg * sa; R(1, 3) = sa * sg + ca * cg * sb;
+R(2, 1) = cb * sa; R(2, 2) = ca * cg + sa * sb * sg; R(2, 3) = cg * sa * sb - ca * sg;
+R(3, 1) = -sb;     R(3, 2) = cb * sg;              R(3, 3) = cb * cg;
+
+% If you prefer returning a transposed matrix
+% R = R';
+
+% If you want to convert the result to single precision (float)
+% R = single(R);
 end
 
 function intersections = calculateIntersections(lens, axis, phi)
