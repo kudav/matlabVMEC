@@ -52,13 +52,13 @@ end
 if isempty(ns)
     ns = double(beam_data.ns_prof1);
 end
-edges = linspace(0,1,ns+1);
+edges = linspace(0,ns/(ns-1),ns);
 ds = diff(edges(1:2));
 s = 0.5.*(edges(1:end-1)+edges(2:end));
 
 % Create profile
 plasma_dvolds = zeros(1,ns-1);
-for i=1:ns
+for i=1:ns-1
     dex1 = beam_data.S_ARR > edges(i);
     dex2 = beam_data.S_ARR <= edges(i+1);
     dex = and(dex1,dex2);

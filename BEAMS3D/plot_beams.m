@@ -71,7 +71,7 @@ if nargin > 1
                     'wall','wall_loss','wall_heat','wall_shine','benchmarks',...
                     'wall_loss_2d','wall_heat_2d','wall_shine_2d',...
                     'wall_loss_log10','wall_heat_log10','wall_shine_log10',...
-                    'grid','grid_s',...
+                    'grid','grid_s','evolution',...
                     'camview','bmir','birth_r','birth_z'}
                 plot_type{end+1}=varargin{i}; %Make multiple plots possible
             case 'beam'
@@ -1104,8 +1104,8 @@ else
                     factor = 1;
                     units = '[W/m^3]';
                 end
-                figure('Position',[1 1 1024 768],'Color','white','InvertHardCopy','off');
-                plot(rho,sum(beam_data.epower_prof(beamdex,:),1).*factor,'b','LineWidth',4); hold on;
+                figure('Position',[1 1 1024 768],'Color','white','InvertHardCopy','off');hold on;
+                plot(rho,sum(beam_data.epower_prof(beamdex,:),1).*factor,'b','LineWidth',4); 
                 plot(rho,sum(beam_data.ipower_prof(beamdex,:),1).*factor,'--r','LineWidth',4);
                 ylim([0 imax.*factor]);
                 set(gca,'FontSize',24);
@@ -1225,14 +1225,37 @@ else
                 switch lower(plot_type{i})
                     case 'wall_loss'
                         val=beam_data.wall_strikes;
+                        factor=1;
+                         clabel = 'Hits [-]';
                     case 'wall_shine'
                         val=sum(beam_data.wall_shine(beamdex,:),1)';
+                        if max(val) > 1E6
+                            factor = 1E6;
+                            clabel = 'MW/m^2';
+                        elseif max(val) > 1E3
+                            factor = 1E3;
+                            clabel = 'kW/m^2';
+                        else
+                            factor = 1;
+                            clabel = 'W/m^2';
+                        end                        
                     case 'wall_heat'
                         val=sum(beam_data.wall_load(beamdex,:),1)';
+                        if max(val) > 1E6
+                            factor = 1E6;
+                            clabel = 'MW/m^2';
+                        elseif max(val) > 1E3
+                            factor = 1E3;
+                            clabel = 'kW/m^2';
+                        else
+                            factor = 1;
+                            clabel = 'W/m^2';
+                        end                         
                 end
-                output_args{1}=patch('Vertices',beam_data.wall_vertex,'Faces',beam_data.wall_faces,'FaceVertexCData',val,'LineStyle','none','CDataMapping','scaled','FaceColor','flat');
+                output_args{1}=patch('Vertices',beam_data.wall_vertex,'Faces',beam_data.wall_faces,'FaceVertexCData',val/factor,'LineStyle','none','CDataMapping','scaled','FaceColor','flat');
                 %Make colors more visible
                 set(output_args{1},'DiffuseStrength',1.0)
+                set(output_args{1},'SpecularStrength',.2)
                 %Add keyboard movement
                 fig = gcf;
                 fig.KeyPressFcn = @ax_keyboard_control;
@@ -1252,9 +1275,11 @@ else
                 cmap = colormap('hot');
                 cmap(1,:) = [0.2 0.2 0.2]; % grey
                 colormap(cmap);
+                c=colorbar;
+                c.Label.String=clabel;
 
             case {'wall_loss_log10','wall_shine_log10','wall_heat_log10'}
-                switch lower(plot_type)
+                switch lower(plot_type{i})
                     case 'wall_loss_log10'
                         val=beam_data.wall_strikes;
                     case 'wall_shine_log10'
@@ -1451,6 +1476,26 @@ else
                 ylabel('Marker Count');
                 title('Mirror Magnetic Field')
                 legend('B_{mirror}=E/\mu','|B| \phi=0','|B| \phi=\phi_{max}/2');
+            case 'evolution'
+                dex = beam_data.end_state==1;
+                t_end_therm=beam_data.t_end(dex);
+                dex = beam_data.end_state==2;
+                t_end_wall=beam_data.t_end(dex);
+                tmax = max(beam_data.t_end);
+                x_t=0:1E-7:tmax;
+                y_therm = histcounts(t_end_therm,x_t);
+                y_wall = histcounts(t_end_wall,x_t);
+                x_plot=0.5.*(x_t(1:end-1)+x_t(2:end));
+                plot(log10(x_plot),1-cumsum(y_therm+y_wall)./double(beam_data.nparticles),'k')
+                hold("on");
+                plot(log10(x_plot),cumsum(y_therm)./double(beam_data.nparticles),'b')
+                plot(log10(x_plot),cumsum(y_wall)./double(beam_data.nparticles),'r')
+                hold("off");
+                xlim([-7 ceil(log10(tmax))])
+                ylim([0 1])
+                xlabel('Time log_{10} [s]');
+                ylabel('Fraction');
+                legend({'Total','Thermalized','Lost'})
             case 'camview'
                 if isempty(camera), camera=[1024 768]; end
                 x_cam = campos;

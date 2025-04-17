@@ -46,11 +46,11 @@ hphi = phiaxis(2) - phiaxis(1);
 hz = zaxis(2) - zaxis(1);
 
 % Constants for the splines
-tolerance = 1e-20;
+tolerance = 1e-30;
 % Constants and parameters for the Newton-Raphson method
 nphi = numel(phiaxis);
 pi2 = 2 * pi;
-max_iterations = 1000;
+max_iterations = 2000;
 
 
 % Initial values for R and Z using beams3d_magaxis function
