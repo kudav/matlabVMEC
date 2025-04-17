@@ -1,4 +1,4 @@
-function pixplot(varargin)
+function [hpcolor] = pixplot(varargin)
 %PIXPLOT([x,y],value) Pseudocolor (checkerboard) plot (on centered grid)
 %   PIXPLOT creates a pseudocolor (checkerboard) plot on a centered grid.
 %   This addresses the issue with pcolor where the last column and row are
@@ -81,6 +81,7 @@ newx(nx+1,ny+1)=2.*newx(nx,ny+1)-newx(nx-1,ny+1);
 newy(nx+1,ny+1)=2.*newy(nx+1,ny)-newy(nx+1,ny-1);
 hpcolor=pcolor(newx,newy,newval);
 set(hpcolor,'EdgeColor','none'); % Get rid of grids
+set(hpcolor, 'AlphaData', ~isnan(newval))
 % Now we create the axes
 % We assume the axes are not equidistant but are cartesian
 xticks=zeros(1,nx);

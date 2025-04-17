@@ -47,12 +47,13 @@ switch filetype
         efit_data.date=sscanf(header,'%*10c %10c %*s',1);
         efit_data.shot=sscanf(header,'%*10c %*10c %9c %*s',1);
         efit_data.time=sscanf(header,'%*10c %*10c %*9c %10c %*s',1);
-        % Use regexp to extract the last three integer numbers
-        numbers = regexp(header, '\d+', 'match'); % Extract all numbers as strings
-        temp = str2double(numbers(end-2:end)); % Convert last three to numeric array
-        efit_data.ipest=temp(1);
-        nx=temp(2);
-        nz=temp(3);
+     % Use regexp to extract the last three integer numbers
+     numbers = regexp(header, '\d+', 'match'); % Extract all numbers as strings
+     temp = str2double(numbers(end-2:end)); % Convert last three to numeric array
+     temp=sscanf(fliplr(header),'%d %d %d %*49c');
+        efit_data.ipest=temp(1)
+        nx=str2double(fliplr(num2str(temp(2))));
+        nz=str2double(fliplr(num2str(temp(1))));
         efit_data.nx=nx;
         efit_data.nz=nz;
         efit_data.xdim=fscanf(fid,'%e',1);

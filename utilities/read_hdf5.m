@@ -36,7 +36,7 @@ for i = 1: nvars
     for j=1:natts
         att_name_local=data_info.Datasets(i).Attributes(j).Name;
         if ~contains(att_name_local,name_local)
-            att_name_local=[name_local '_' strrep(att_name_local,' ','_')];
+            att_name_local=[name_local '_att_' strrep(att_name_local,' ','_')];
         end
         %data.(att_name_local) = data_info.Datasets(i).Attributes(j).Value{1};
         data.(att_name_local) = data_info.Datasets(i).Attributes(j).Value;
@@ -68,7 +68,7 @@ for i = 1: nvars
     for j=1:natts
         att_name_local=data_info.Datasets(i).Attributes(j).Name;
         if ~startsWith(att_name_local,name_local)
-            att_name_local=[name_local '_' strrep(att_name_local,' ','_')];
+            att_name_local=[name_local '_att_' strrep(att_name_local,' ','_')];
         end
         %data.(att_name_local) = data_info.Datasets(i).Attributes(j).Value{1};
         data.(att_name_local) = data_info.Datasets(i).Attributes(j).Value;
