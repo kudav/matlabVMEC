@@ -1086,15 +1086,19 @@ for i = 1:size(plot_type,2)
             vec = [0, 0, -1];
             lens = rotate_points(geom.spec.lens,vec,deg2rad(rotation));
             axi = rotate_points(geom.spec.axis,vec,deg2rad(rotation));
-            los = [lens, lens + axi.*max(sqrt(sum(lens(channel,1:2).^2,2)))*length];
-            los = reshape(los,geom.spec.nchan,3,2);
-            plot3(ax{i},squeeze(los(channel,1,:))'*fac,squeeze(los(channel,2,:))'*fac,squeeze(los(channel,3,:))'*fac,linestyle);
+            %los = [lens, lens + axi.*max(sqrt(sum(lens(channel,1:2).^2,2)))*length];
+            %los = reshape(los,geom.spec.nchan,3,2);
+            [xpts,ypts,zpts] = getPointsAlongAxis(lens', axi', 50, length);
+            plot3(ax{i},xpts(:,channel)*fac,ypts(:,channel)*fac,zpts(:,channel)*fac,linestyle);
             src = rotate_points(geom.nbi.src,vec,deg2rad(rotation));
             axi_nbi = rotate_points(geom.nbi.axis,vec,deg2rad(rotation));
-            los_nbi = [src, src + axi_nbi.*length.*sqrt(sum(src(1:2).^2))];
-            los_nbi = reshape(los_nbi,3,2);
-            plot3(ax{i},squeeze(los_nbi(1,:))'*fac,squeeze(los_nbi(2,:))'*fac,squeeze(los_nbi(3,:))'*fac,'-r');
-            plot3(ax{i},squeeze(los_nbi(1,1))'*fac,squeeze(los_nbi(2,1))'*fac,squeeze(los_nbi(3,1))'*fac,'+k');
+            [xpts,ypts,zpts] = getPointsAlongAxis(src', axi_nbi', 50, length);
+            plot3(ax{i},xpts*fac,ypts*fac,zpts*fac,'-r');          
+            plot3(ax{i},xpts(1)*fac,ypts(1)*fac,zpts(1)*fac,'+k');  
+            %los_nbi = [src, src + axi_nbi.*length.*sqrt(sum(src(1:2).^2))];
+            % los_nbi = reshape(los_nbi,3,2);
+            % plot3(ax{i},squeeze(los_nbi(1,:))'*fac,squeeze(los_nbi(2,:))'*fac,squeeze(los_nbi(3,:))'*fac,'-r');
+            % plot3(ax{i},squeeze(los_nbi(1,1))'*fac,squeeze(los_nbi(2,1))'*fac,squeeze(los_nbi(3,1))'*fac,'+k');
             if isfield(input,'xmin')
             coords = [input.xmin input.ymin input.zmin;...
                 input.xmax input.ymin input.zmin;...
