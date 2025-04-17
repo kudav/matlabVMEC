@@ -105,6 +105,10 @@ if nargin > 1
                 else
                     disp('iota not found in data! Plotting normally!')
                 end
+            case 'surface'
+                i=i+1;
+                dex=varargin{i};                
+
         end
         i=i+1;
     end
@@ -115,6 +119,8 @@ switch plottype
         line_dex = nphi:npoinc:nsteps;
         if isempty(dex)
             dex=1:skip:nlines;
+        else 
+            line_dex=line_dex(1:skip:end);
         end
         x=data.R_lines(dex,line_dex);
         y=data.Z_lines(dex,line_dex);
@@ -149,7 +155,7 @@ switch plottype
             plot(data.Rhc_lines(1,nphi),data.Zhc_lines(1,nphi),'+r');
             hold off
         end
-        axis equal
+       % axis equal
         xlabel('R [m]')
         ylabel('Z [m]')
         xlim([data.raxis(1) data.raxis(end)])
