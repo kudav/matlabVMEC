@@ -1,12 +1,15 @@
 function fidasim_out = read_fidasim(runid, varargin)
 %UNTITLED3 Summary of this function goes here
 %   Detailed explanation goes here
-if (strcmp(runid(end-1:end),'h5'))
+if (strcmp(runid(end-2:end),'.h5'))
     disp('ERROR: Only give runid (dist and eq runids are loaded automatically!');
     disp(['       runidname: ' runid]);
     return
 end
 b3d_S=[];
+efit={};
+vmec={};
+lrunid=0;%Give precendent to output files according to runid
 if nargin > 1
     i = 1;
     ldist=0;
@@ -40,7 +43,7 @@ if nargin > 1
                     lneut=1;
                     leq=1;
                     lweight=1;
-                    lbirth=1;    
+                    lbirth=1;
                 end
                 i = i+1;
                 b3d_filename=varargin{i};
@@ -48,6 +51,16 @@ if nargin > 1
                 r = h5read(b3d_filename,'/raxis');
                 phi = h5read(b3d_filename,'/phiaxis');
                 z = h5read(b3d_filename,'/zaxis');
+            case 'efit'
+                lgeom=1;
+                i=i+1;
+                efit=varargin{i}; 
+            case 'vmec'
+                lgeom=1;
+                i=i+1;
+                vmec=varargin{i}; 
+            case 'runid'
+                lrunid=1;
         end
         i=i+1;
     end
@@ -78,7 +91,7 @@ if isfile(nml_name)
             input.(fields{i}) = strrep(currentValue, '%%FIDASIM_PATH%%NUMBER', runid(1:2));
         end
     end
-    
+
     %This ignores the full path and searches for the files in the current
     %directory
     dist_name=splitfn(input.distribution_file);
@@ -88,18 +101,21 @@ if isfile(nml_name)
     neut_name=splitfn(input.neutrals_file);
     fidasim_out.input=input;
 
-if ~isfile(dist_name)
-    dist_name = [runid, '_distribution.h5'];
-end
-if ~isfile(eq_name)
-    eq_name = [runid,'_equilibrium.h5'];
-end
-if ~isfile(geom_name)
-    geom_name = [runid,'_geometry.h5'];
-end
-if ~isfile(neut_name)
-     neut_name = [runid, '_neutrals.h5'];
-end
+    if ~isfile(dist_name)||lrunid
+        dist_name = [runid, '_distribution.h5'];
+    end
+    if ~isfile(eq_name)||lrunid
+        eq_name = [runid,'_equilibrium.h5'];
+    end
+    if ~isfile(geom_name)||lrunid
+        geom_name = [runid,'_geometry.h5'];
+        if ~isfile(geom_name)
+            geom_name=input.geometry_file;
+        end
+    end
+    if ~isfile(neut_name)||lrunid
+        neut_name = [runid, '_neutrals.h5'];
+    end
 else
     disp('Could not find input namelist, using defaults!')
     dist_name = [runid, '_distribution.h5'];
@@ -115,7 +131,7 @@ spec_name = [runid,'_spectra.h5'];
 
 
 
-fidasim_out.dist_name=dist_name;    
+fidasim_out.dist_name=dist_name;
 fidasim_out.eq_name=eq_name;
 fidasim_out.neut_name=neut_name;
 fidasim_out.geom_name=geom_name;
@@ -138,12 +154,24 @@ end
 if isfile(eq_name)&&leq
     disp([' Reading file: ' eq_name]);
     eq = read_hdf5(eq_name);
-    if ~isempty(b3d_S)
         [rgrid,phigrid,zgrid]=ndgrid(eq.fields.r/100,eq.fields.phi,eq.fields.z/100);
-        eq.fields.s = interp3(r,phi,z,...
-            permute(sqrt(b3d_S),[2 1 3]),rgrid,mod(phigrid,phi(end)),zgrid,'linear',NaN);
-        eq.fields.s=permute(eq.fields.s,[1 3 2]);
-    end    
+        if ~isempty(efit)
+            etmp=interp2(efit.xgrid,efit.zgrid,efit.psixz',rgrid,zgrid,'linear',NaN);
+            eq.fields.s=interp1(linspace(efit.psiaxis,efit.psilim,numel(efit.qpsi)),linspace(0,1,numel(efit.qpsi)),etmp).^2;
+            eq.fields.s=permute(eq.fields.s,[1 3 2]);
+            r=efit.xgrid;
+            z=efit.zgrid;
+            phi=eq.fields.phi;
+        elseif ~isempty(vmec)
+            % if ~isfield(vmec,'Fchi')
+            %     vmec=vmec_rzphi_s_interp(vmec);
+            % end
+            % eq.fields.s=vmec.Fchi(rgrid,phigrid,zgrid);
+        elseif ~isempty(b3d_S)
+            eq.fields.s = interp3(r,phi,z,...
+                permute(sqrt(b3d_S),[2 1 3]),rgrid,mod(phigrid,phi(end)),zgrid,'linear',NaN);
+            eq.fields.s=permute(eq.fields.s,[1 3 2]);
+        end
     fidasim_out.eq=eq;
 
 elseif ~leq
@@ -174,6 +202,7 @@ end
 if isfile(spec_name)&&lspec
     disp([' Reading file: ' spec_name]);
     spec = read_hdf5(spec_name);
+    spec.specr= spec.full + spec.half + spec.third + spec.halo + spec.dcx + spec.fida;% + spec.brems;
     fidasim_out.spec=spec;
 elseif ~lspec
     disp('Skipping spectra')
@@ -185,29 +214,38 @@ if isfile(geom_name)&&lgeom
     disp([' Reading file: ' geom_name]);
     geom = read_hdf5(geom_name);
     if isfield(fidasim_out,'eq')
-        if isfield(fidasim_out.eq.fields,'s')
-        disp('Calculating rho values of LOS')
-         % Number of lines of sight in spec
-        nchan = geom.spec.nchan;
-        
-        % Initialize array to hold closest points
-        closest_points = zeros(3, nchan);
-        
-        % Loop through each line of sight in spec
-        for i = 1:nchan
-            % Get the line of sight direction and a point on the line
-            % spec_line_dir = fidasim_out.geom.spec.axis(:,i);
-            % spec_point = fidasim_out.geom.spec.lens(:,i);         
-            % Find the closest point on nbi_axis to the current line of sight
-            closest_points(:,i) = closest_point_on_line(geom.nbi.axis,geom.nbi.src, geom.spec.axis(:,i), geom.spec.lens(:,i));
-        end
-        geom.spec.closest_points=closest_points;
-        [closest_points(2,:),closest_points(1,:),closest_points(3,:)]=cart2pol(closest_points(1,:),closest_points(2,:),closest_points(3,:));
-        geom.spec.closest_points_cyl=closest_points;
-        geom.spec.rho = interp3(r*100,phi,z*100,...
-            permute(sqrt(b3d_S),[2 1 3]),closest_points(1,:),mod(closest_points(2,:),phi(end)),closest_points(3,:),'linear',NaN);
-        %geom.spec.rho = interp3(eq.fields.r,eq.fields.z,eq.fields.phi,...
-        %    permute(eq.fields.s,[2 1 3]),closest_points(1,:),closest_points(3,:),mod(closest_points(2,:),phi(end)),'linear');       
+        if isfield(fidasim_out.eq.fields,'s')||~isempty(vmec)
+            disp('Calculating rho values of LOS')
+            % Number of lines of sight in spec
+            nchan = geom.spec.nchan;
+
+            % Initialize array to hold closest points
+            closest_points = zeros(3, nchan);
+
+            % Loop through each line of sight in spec
+            for i = 1:nchan
+                % Get the line of sight direction and a point on the line
+                % spec_line_dir = fidasim_out.geom.spec.axis(:,i);
+                % spec_point = fidasim_out.geom.spec.lens(:,i);
+                % Find the closest point on nbi_axis to the current line of sight
+                closest_points(:,i) = closest_point_on_line(geom.nbi.axis,geom.nbi.src, geom.spec.axis(:,i), geom.spec.lens(:,i));
+            end
+            geom.spec.closest_points=closest_points;
+            [closest_points(2,:),closest_points(1,:),closest_points(3,:)]=cart2pol(closest_points(1,:),closest_points(2,:),closest_points(3,:));
+            geom.spec.closest_points_cyl=closest_points;
+            if ~isempty(efit)
+                geom.spec.rho = interp2(eq.fields.r,eq.fields.z,...
+                    squeeze(sqrt(eq.fields.s(:,:,1)))',closest_points(1,:),closest_points(3,:),'linear',NaN);
+            elseif ~isempty(vmec)
+                geom.spec.rho = sqrt(vmec.Fchi(closest_points(1,:)/100,mod(closest_points(2,:),vmec.zeta(end)),closest_points(3,:)/100));
+            %     geom.spec.rho = interp3(eq.fields.r,eq.fields.phi,eq.fields.z,...
+            %         permute(sqrt(eq.fields.s),[3 1 2]),closest_points(1,:),mod(closest_points(2,:),phi(end)),closest_points(3,:),'linear',NaN);
+             elseif ~isempty(b3d_S)
+                geom.spec.rho = interp3(r*100,phi,z*100,...
+                    permute(sqrt(b3d_S),[2 1 3]),closest_points(1,:),mod(closest_points(2,:),phi(end)),closest_points(3,:),'linear',NaN);
+            end
+            %geom.spec.rho = interp3(eq.fields.r,eq.fields.z,eq.fields.phi,...
+            %    permute(eq.fields.s,[2 1 3]),closest_points(1,:),closest_points(3,:),mod(closest_points(2,:),phi(end)),'linear');
         end
     end
     fidasim_out.geom=geom;
@@ -235,29 +273,29 @@ end
 
 
 function closest_point = closest_point_on_line(axis_dir, axis_point, line_dir, line_point)
-    % axis_dir: 3x1 vector representing the direction of the nbi axis
-    % axis_point: 3x1 vector representing a point on the nbi axis
-    % line_dir: 3x1 vector representing the direction of the line of sight
-    % line_point: 3x1 vector representing a point on the line of sight
-    
-    % Calculate the vector between the two points
-    w0 = axis_point - line_point;
-    
-    % Calculate the coefficients for the lines
-    a = dot(axis_dir, axis_dir);
-    b = dot(axis_dir, line_dir);
-    c = dot(line_dir, line_dir);
-    d = dot(axis_dir, w0);
-    e = dot(line_dir, w0);
-    
-    % Calculate the parameters that minimize the distance
-    sc = (b*e - c*d) / (a*c - b^2);
-    tc = (a*e - b*d) / (a*c - b^2);
-    
-    % Calculate the closest points on both lines
-    closest_point_axis = axis_point + sc * axis_dir;
-    closest_point_line = line_point + tc * line_dir;
-    
-    % The closest point on the line of sight to the axis line
-    closest_point = closest_point_line;
+% axis_dir: 3x1 vector representing the direction of the nbi axis
+% axis_point: 3x1 vector representing a point on the nbi axis
+% line_dir: 3x1 vector representing the direction of the line of sight
+% line_point: 3x1 vector representing a point on the line of sight
+
+% Calculate the vector between the two points
+w0 = axis_point - line_point;
+
+% Calculate the coefficients for the lines
+a = dot(axis_dir, axis_dir);
+b = dot(axis_dir, line_dir);
+c = dot(line_dir, line_dir);
+d = dot(axis_dir, w0);
+e = dot(line_dir, w0);
+
+% Calculate the parameters that minimize the distance
+sc = (b*e - c*d) / (a*c - b^2);
+tc = (a*e - b*d) / (a*c - b^2);
+
+% Calculate the closest points on both lines
+closest_point_axis = axis_point + sc * axis_dir;
+closest_point_line = line_point + tc * line_dir;
+
+% The closest point on the line of sight to the axis line
+closest_point = closest_point_line;
 end
