@@ -1465,12 +1465,12 @@ else
                 [N,edges] = histcounts(B_mir(dex1,born_dex),edges);
                 fig=figure('Position',[1 1 1024 768],'Color','white','InvertHardcopy','off');
                 centers = 0.5.*(edges(1:end-1)+edges(2:end));
-                plot(centers,N,'k','LineWidth',4);
                 axis tight;
                 hold on;
-                y=ylim;
+                y=[0 max(N)*1.05];
                 fill([B0_min B0_max B0_max B0_min],[y(1) y(1) y(2) y(2)],'red','LineStyle','none','FaceAlpha','0.3')
                 fill([B1_min B1_max B1_max B1_min],[y(1) y(1) y(2) y(2)],'blue','LineStyle','none','FaceAlpha','0.3')
+                plot(centers,N,'k','LineWidth',4);
                 set(gca,'FontSize',24);
                 xlabel('B [T]');
                 ylabel('Marker Count');

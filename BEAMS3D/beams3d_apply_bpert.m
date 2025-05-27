@@ -78,7 +78,8 @@ rnorm=repmat(r,1,size(br,2),size(br,3));
 
 sarr = h5read(filename_in,'/S_ARR');
 uarr = h5read(filename_in,'/U_ARR');
-sarr(sarr>1.5)=0;
+sdex=sarr>1.5;%enable later re-setting this to 1.5
+sarr(sdex)=0;
 u = zeros(size(sarr,1),size(sarr,3));
 %uarr2 = zeros(size(sarr,1),size(sarr,3));
 rhoarr = sqrt(sarr);
@@ -167,7 +168,8 @@ switch form
 end
 
 
-fluxphi = fluxir .* cos(mi.*uarr - ni .* phig-phase);%.*rg;
+%fluxphi = fluxir .* cos(mi.*uarr - ni .* phig-phase);%.*rg;
+fluxphi = fluxir .* cos( ni .* phig- mi.*uarr -phase);%.*rg;
 
 %%
 %%SWITCH X and Y components of gradient because of matlab reasons...
@@ -263,9 +265,30 @@ if lplot
         ylabel('Z')        
 end
 
+bpert=sqrt(sum(bpert.^2,4));
+%modb=sqrt(br.^2+bphi.^2+bz.^2);
 br = br + curlr;
 bphi = bphi + curlphi;
 bz = bz + curlz;
+
+
+% spline
+[C, IA, ~] = unique(sarr);
+s=linspace(0,1,128);
+bpert_prof = pchip(C,bpert(IA),s);
+fluxir_prof = pchip(C,fluxir(IA),s);%alpha_mn
+fluxphi_prof = pchip(C,fluxphi(IA),s);%alpha_mn
+
+if lplot
+    figure
+    hold on
+    plot(s,bpert_prof)
+    plot(s,fluxir_prof)
+    plot(s,fluxphi_prof)
+    %plot(s,mi.*fluxir_prof./s/3)
+end
+
+sarr(sdex)=1.5;
 
 if llines
 br = br./bphi.*rnorm;

@@ -408,6 +408,8 @@ if ~lloaded
         input=read_namelist([file,'_inputs.dat'],'fidasim_inputs');
         else
             disp('Input namelist not found! Using standard names!')
+            input={};
+            linput=false;
         end
     end
     if ldist
@@ -754,9 +756,15 @@ for i = 1:size(plot_type,2)
         case 'epplot'
             if ndims(dist.f) == 5
                 tmp = squeeze(trapz(dphi,trapz(dz,dist.f,4),5));
+                if ldiff
+                    tmp2 = squeeze(trapz(dphi,trapz(dz,dist2.f,4),5));
+                end
                 rtmp = permute(repmat(dr,1,size(dist.f,1),size(dist.f,2),1),[2,3,1]);
             elseif ndims(dist.f)==4
                 tmp = squeeze(trapz(dz,dist.f,4))*2*pi;
+                if ldiff
+                    tmp2 = squeeze(trapz(dz,dist2.f,4))*2*pi;
+                end                
                 if r0_ind~=r1_ind
                     rtmp = permute(repmat(rdphi(r0_ind:r1_ind),1,size(dist.f,1),size(dist.f,2),1),[2,3,1]);
                 else
@@ -765,13 +773,35 @@ for i = 1:size(plot_type,2)
             elseif ismatrix(dist.f)
                 rtmp = permute(repmat(dr,1,size(dist.f,1),size(dist.f,2),1),[2,3,1]);
                 tmp = dist.f;
+                if ldiff
+                    tmp2 = dist2.f;
+                end 
             end
             if r0_ind~= r1_ind
                 tmp = squeeze(trapz(dist.r(r0_ind:r1_ind),rtmp.*tmp,3));
-                cstring='Fast Ion Distribution [1/keV]';
+                cstring='Fast Ion Distribution [1/keV]';                
+                if ldiff
+                    tmp2 = squeeze(trapz(dist.r(r0_ind:r1_ind),rtmp.*tmp2,3));
+                    if lrel
+                        tmp = ((tmp-tmp2)./tmp2).^1;
+                        tmp(tmp2<1)=0;
+                        cstring='Rel. difference (f_1-f_2)/f_2 [-]'; 
+                    else
+                        tmp=tmp-tmp2;
+                        cstring='Difference (f_1-f_2) [1/keV]'; 
+                    end  
+                end
             else
                 if ndims(tmp)==3
                 tmp = squeeze(trapz(dr,rtmp.*tmp,3));
+                if ldiff
+                    tmp2 = squeeze(trapz(dr,rtmp.*tmp2,3));
+                    if lrel
+                         tmp = ((tmp-tmp2)./tmp2).^1;
+                    else
+                        tmp=tmp-tmp2;
+                    end  
+                end                
                 cstring='Fast Ion Distribution [1/keV]';
                 else
                     cstring='Local Fast Ion Distribution [1/keV/cm^3]';
@@ -949,26 +979,26 @@ for i = 1:size(plot_type,2)
         case 'fdenf'
             r = dist.r;
             phi = eq.fields.phi;
-            z = dist.z;            
+            z = dist.z;
             if size(dist.f,1)==numel(dist.energy)
                 tmp = squeeze(trapz(dist.pitch,trapz(dist.energy,dist.f,1),2));
                 if ldiff
-                tmp2 =squeeze(trapz(dist.pitch,trapz(dist.energy,dist2.f,1),2));
-                if lrel
-                tmp = (tmp-tmp2)./tmp2;
-                else
-                    tmp=tmp-tmp2;
-                end
+                    tmp2 =squeeze(trapz(dist.pitch,trapz(dist.energy,dist2.f,1),2));
+                    if lrel
+                        tmp = (tmp-tmp2)./tmp2;
+                    else
+                        tmp=tmp-tmp2;
+                    end
                 end
             else
                 tmp = squeeze(trapz(dist.pitch(p_min:p_max),trapz(dist.energy(e_min:e_max),dist.f(:,:,:,:),1),2));
                 if ldiff
-                tmp2 = squeeze(trapz(dist.pitch(p_min:p_max),trapz(dist.energy(e_min:e_max),dist2.f(:,:,:,:),1),2));
-                if lrel
-                tmp = (tmp-tmp2)./tmp;
-                else
-                    tmp=tmp-tmp2;
-                end
+                    tmp2 = squeeze(trapz(dist.pitch(p_min:p_max),trapz(dist.energy(e_min:e_max),dist2.f(:,:,:,:),1),2));
+                    if lrel
+                        tmp = (tmp-tmp2)./tmp;
+                    else
+                        tmp=tmp-tmp2;
+                    end
                 end
             end
             if fac == 1

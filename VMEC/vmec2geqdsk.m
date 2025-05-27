@@ -72,11 +72,11 @@ psixz(isnan(psixz)) = 0.0;
 
 % Write the file
 fid = fopen(filename,'w');
-fprintf(fid,'%-10s','VMEC');
-fprintf(fid,'%10s TTT T',datestr(now,'mm/dd/yy'));
+fprintf(fid,'%-10s','  VMEC');
+fprintf(fid,'%10s TTT UU',datestr(now,'mm/dd/yyyy'));
 fprintf(fid,'%10s','  00001');
 fprintf(fid,'%10s',' t~  0000  ');
-fprintf(fid,'%4d %4d %4d\n',0,nx,nz);
+fprintf(fid,'%4d%4d%4d\n',0,nx,nz);
 fprintf(fid,'% 15.9E',vmec_data.rmaxsurf.*1.1);
 fprintf(fid,'% 15.9E',vmec_data.zmaxsurf.*1.1);
 fprintf(fid,'% 15.9E',vmec_data.rminsurf.*0.9);
@@ -116,8 +116,8 @@ fprintf(fid,'\n');
 fprintf(fid,'% 15.9E% 15.9E% 15.9E% 15.9E% 15.9E\n',pchip(phin,1./vmec_data.iotaf,0:1/(nx-1):1)); %sf
 fprintf(fid,'\n');
 
-fprintf(fid,'%05d ',ntheta);
-fprintf(fid,'%05d\n',ntheta);
+fprintf(fid,'%5d',ntheta);
+fprintf(fid,'%5d\n',ntheta);
 tmp=[r(end,:,1);z(end,:,1)];
 fprintf(fid,'% 15.9E% 15.9E% 15.9E% 15.9E% 15.9E\n',tmp(:)); %rbdry
 fprintf(fid,'\n');

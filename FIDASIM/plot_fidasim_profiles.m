@@ -347,19 +347,19 @@ for i = 1:size(plot_type,2)
             plot_fidasim(filename,'spectrum',channel_spec,'ax',ax(i),'sim_data',in_data);
         case 'bck'
             tmp = bg(dex);
-            ystr = 'BG';
+            ystr = 'BG [Ph/(s m^2 sr)]';
         case 'bes'
             tmp = bes(dex);
-            ystr = 'BES';
+            ystr = 'BES [Ph/(s m^2 sr)]';
         case 'fida'
             tmp = fida(dex);
-            ystr = 'FIDA';
+            ystr = 'FIDA [Ph/(s m^2 sr)]';
         case 'fidabes'
             tmp = fida(dex)./bes(dex).*abs(diff(bes_range(dex,:),1,2)'./diff(fida_range));
-            ystr = 'FIDA/BES';
+            ystr = 'FIDA/BES [-]';
         case {'fida_bck','fidabck','fidabg'}
             tmp = fida(dex)./bg(dex).*diff(bg_range)./diff(fida_range);
-            ystr = 'FIDA/BACKGROUND';
+            ystr = 'FIDA/BACKGROUND [-]';
         case 'fidaspec'
             plot(ax{i},lambda(fida_dex), spec(fida_dex,dex),linestyle,'DisplayName',dispname, 'LineWidth',2.0);
             xlabel(ax{i},'Wavelength [nm]')
@@ -395,6 +395,7 @@ for i = 1:size(plot_type,2)
                     disp(['Found no surfaces for q=', num2str(iota_vec(m))])
                 end
             end
+            xline(ax{i},efit.xax(1)*100*fac,'--',{sprintf('Axis',iota_vec(m))},'HandleVisibility','off');
         elseif ~isempty(vmec)
             if ~isfield(vmec,'Fchi')
                 vmec=vmec_rzphi_s_interp(vmec);
@@ -411,6 +412,7 @@ for i = 1:size(plot_type,2)
                     disp(['Found no surfaces for q=', num2str(iota_vec(m))])
                 end
             end
+            %xl=xline(ax{i},vmec.axisr,'--',{sprintf('Axis',iota_vec(m))},'HandleVisibility','off');
         end
         if lrho
             if ~isempty(vmec)

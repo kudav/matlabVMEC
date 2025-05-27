@@ -79,12 +79,10 @@ if isfile(nml_name)
     input=read_namelist(nml_name,'fidasim_inputs');
     % Get all field names in the structure
     fields = fieldnames(input);
-
     % Loop through each field
     for i = 1:numel(fields)
         % Get the current field's value
         currentValue = input.(fields{i});
-
         % Check if the field contains a character array
         if ischar(currentValue)
             % Replace the old substring with the new one
