@@ -27,7 +27,7 @@ else
 end
 % Find the namelist section
 line=fgetl(fid);
-while ~feof(fid) && isempty(strfind(line,namelist))
+while ~feof(fid) && ~contains(lower(line),lower(namelist))
     line=fgetl(fid);
 end
 if feof(fid)

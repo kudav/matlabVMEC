@@ -32,6 +32,12 @@ if (strcmp(filename(end-1:end),'h5'))
         data.Y_lines=squeeze(data.Y_lines(:,1,:));
         data.Z_lines=squeeze(data.Z_lines(:,1,:));
     end
+    % Fix for Fieldlines interface NaN values at last phi location
+    if all(isnan(data.S_ARR(:,end,:)))
+        disp('Found NaNs in last phi location of S_ARR, replacing with first phi location!')
+        data.S_ARR(:,end,:)=data.S_ARR(:,1,:);
+        data.U_ARR(:,end,:)=data.U_ARR(:,1,:);
+    end
     data.lwall=0;
     if isfield(data,'wall_strikes')
         data.wall_strikes = double(data.wall_strikes);

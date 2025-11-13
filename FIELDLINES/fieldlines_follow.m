@@ -92,7 +92,7 @@ if ~isempty(ye)
     else
         R_lines = arrayfun(@(idx) ye(ie == idx,1:nstart)', 1:length(poinc_loc), 'UniformOutput', false);
         Z_lines = arrayfun(@(idx) ye(ie == idx,nstart+1:end)', 1:length(poinc_loc), 'UniformOutput', false);
-        PHI_lines = arrayfun(@(idx) repmat(poinc_loc(idx),length(find(ie == idx)),nstart), 1:length(poinc_loc), 'UniformOutput', false);
+        PHI_lines = arrayfun(@(idx) repmat(poinc_loc(idx),length(find(ie == idx)),nstart)', 1:length(poinc_loc), 'UniformOutput', false);
     end
 else
     R_lines=[];

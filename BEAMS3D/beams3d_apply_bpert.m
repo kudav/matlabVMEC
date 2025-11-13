@@ -78,23 +78,10 @@ rnorm=repmat(r,1,size(br,2),size(br,3));
 
 sarr = h5read(filename_in,'/S_ARR');
 uarr = h5read(filename_in,'/U_ARR');
-sarr(sarr>1.5)=0;
+sdex=sarr>1.5;%enable later re-setting this to 1.5
+sarr(sdex)=0;
 u = zeros(size(sarr,1),size(sarr,3));
 %uarr2 = zeros(size(sarr,1),size(sarr,3));
-s=discretize(sarr,linspace(0,1,128));
-s(isnan(s))=max(s,[],'all')+1;
-if lvmec
-    disp('USING PEST ANGLE FROM VMEC')
-for i= 1:numel(r)
-for j = 1:1
-    for k = 1:numel(z)
-        u(i,k)=vmec2pest(s(i,j,k),uarr(i,j,k),phi(j),vmec.lmns,vmec.xm,vmec.xn);
-    end
-end
-end
-uarr=permute(repmat(u,1,1,size(uarr,2)),[1,3,2]);
-end
-
 rhoarr = sqrt(sarr);
 %[r0, phi0, z0] = meshgrid(r,phi,z);
 [rg, phig, zg] = ndgrid(r,phi,z);
@@ -103,6 +90,37 @@ yg = rg .* sin(phig);
 %bx = br .* cos(bphi);
 %by = br.* sin(bphi);
 
+if lvmec
+    disp('USING PEST ANGLE FROM VMEC')
+    s=1:vmec.ns;
+    theta=linspace(0,2*pi,64);
+    zeta=0;
+    u = zeros(numel(s),numel(theta));
+    for i=1:numel(s)
+        for j=1:numel(theta)
+            u(i,j)=vmec2pest(s(i),theta(j),zeta,vmec.lmns,vmec.xm,vmec.xn);
+        end
+    end
+    rv=cfunct(theta,zeta,vmec.rmnc,vmec.xm,vmec.xn);
+    rv=rv+sfunct(theta,zeta,vmec.rmns,vmec.xm,vmec.xn);
+    zv=sfunct(theta,zeta,vmec.zmns,vmec.xm,vmec.xn);
+    zv=zv+cfunct(theta,zeta,vmec.zmnc,vmec.xm,vmec.xn);
+    Fu= scatteredInterpolant(rv(:),zv(:),u(:),'natural','none');
+    uarr=Fu(rg,zg);
+    % s=discretize(sarr,linspace(0,1,128));
+    % s(isnan(s))=max(s,[],'all')+1;
+    % for i= 1:numel(r)
+    %     for j = 1:1
+    %         for k = 1:numel(z)
+    %             u(i,k)=vmec2pest(s(i,j,k),uarr(i,j,k),phi(j),vmec.lmns,vmec.xm,vmec.xn);
+    %         end
+    %     end
+    % end
+    % uarr=permute(repmat(u,1,1,size(uarr,2)),[1,3,2]);
+end
+
+
+
 switch form
     case 'res'
         % Given parameters
@@ -110,36 +128,48 @@ switch form
         beta = 0.87;
         gamma = 0.01;
         %s_21 = 0.2693;
-        s_21 = 0.5693;
-        fluxir = islandWidthPerturbation(sarr, mi, ni, fluxi0, s_21, alpha, beta, gamma);
+        s_21 = 0.2;%36389 6.5s
+        %s_21 = 0.5693; %for 38507 5.65s
+        fluxir = islandWidthPerturbation(sarr, mi, fluxi0, s_21, alpha, beta, gamma,lplot);
     case 'vacstrum'
         %Strumberger 2008, Perturbation 2: fluxi0=0.1
         fluxir= fluxi0.*(sarr).^(2/2) .* (1-sarr).^4;
+        fluxir(sarr>1.05)=0;
         %Quadratic/analytical form in rho:
         %fluxir = fluxi0(i) * (rhoarr.^2) .*  (1- rhoarr).^2;
+        if lplot
+            figure
+            x=linspace(0,1.5,100);
+            %plot(x,f(x));
+            hold on
+            y=fluxi0*(x).^(2/2) .* (1-x).^4;
+            y(x>1.05)=0;
+            plot(x,y);
+            xlabel('S=\rho^2')
+            ylabel('Perturbation Amplitude');
+        end
     case 'vacfcn'
-        c1=2;
-        c2=4;
+        c1=1;
+        c2=6;
         c3=1;
         f=@(x) x.^(c1/2).*(1-x).^c2;
         fluxir= fluxi0*f(sarr).^c3;
+        if lplot
+            figure
+            x=linspace(0,1.5,100);
+            %plot(x,f(x));
+            hold on
+            y=f(x);
+            y(x>1.05)=0;
+            plot(x,y);
+            xlabel('S=\rho^2')
+            ylabel('Perturbation Amplitude');
+        end        
 end
-% 
-% if lplot
-%     figure
-%     x=linspace(0,1,100);
-%     plot(x,f(x));
-%     hold on
-%     %plot(x,fluxi0(i)*(sqrt(x)).^(2/2) .* (1-sqrt(x)).^4);
-%     %plot(linspace(0,1,100),.1*linspace(0,1,100).^(2/2) .* (1-linspace(0,1,100)).^2);
-%     %plot(rhoarr,fluxir);
-%     %plot(rhoarr,fluxir_s);
-%     xlabel('S=\rho^2')
-%     ylabel('Perturbation Amplitude');
-% end
 
 
-fluxphi = fluxir .* cos(mi.*uarr - ni .* phig-phase);%.*rg;
+%fluxphi = fluxir .* cos(mi.*uarr - ni .* phig-phase);%.*rg;
+fluxphi = fluxir .* cos( ni .* phig- mi.*uarr -phase);%.*rg;
 
 %%
 %%SWITCH X and Y components of gradient because of matlab reasons...
@@ -188,14 +218,20 @@ switch calculation
         bpert=cross(gradB,gradphi);
 
     case 'ferrari'
-        fluxphi(sarr>1.05)=0;        
-        brc = br;%.* fluxphi;
-        bphic = bphi.* fluxphi;
-        bzc = bz;%.* fluxphi;        
-        %[curl_br,curl_bphi,curl_bz,~] = curl(rg,phig,zg,brc,bphic,bzc);
-        [curl_br,curl_bphi,curl_bz,~] =  curl(brc,bphic,bzc);
+        fluxphi(sarr>1.05)=0;
+        %brc = br.* fluxphi;
+        %bphic = bphi.* fluxphi;
+        %bzc = bz.* fluxphi;
+        %[rg, phig, zg] = meshgrid(r,phi,z);
+        %[curl_bphi,curl_br,curl_bz,~] = curl(phig,rg,zg,bphic,brc,bzc);
+        %[curl_bphi,curl_br,curl_bz,~] = curl(bphic,brc,bzc);
+        [curl_bphi,curl_br,curl_bz,~] = curl(fluxphi,zeros(size(fluxphi)),zeros(size(fluxphi)));
+
+        %curl_bphi=zeros(size(curl_bphi));
+        %[curl_br,curl_bphi,curl_bz] =  curlCylindricalNd(brc,bphic,bzc,r,phi,z);
         bpert = cat(4, curl_br, curl_bphi, curl_bz);
 end
+
 curlr=squeeze(bpert(:,:,:,1));%.*rg;
 curlphi=squeeze(bpert(:,:,:,2));
 curlz=squeeze(bpert(:,:,:,3));%.*rg;
@@ -229,9 +265,30 @@ if lplot
         ylabel('Z')        
 end
 
+bpert=sqrt(sum(bpert.^2,4));
+%modb=sqrt(br.^2+bphi.^2+bz.^2);
 br = br + curlr;
 bphi = bphi + curlphi;
 bz = bz + curlz;
+
+
+% spline
+[C, IA, ~] = unique(sarr);
+s=linspace(0,1,128);
+bpert_prof = pchip(C,bpert(IA),s);
+fluxir_prof = pchip(C,fluxir(IA),s);%alpha_mn
+fluxphi_prof = pchip(C,fluxphi(IA),s);%alpha_mn
+
+if lplot
+    figure
+    hold on
+    plot(s,bpert_prof)
+    plot(s,fluxir_prof)
+    plot(s,fluxphi_prof)
+    %plot(s,mi.*fluxir_prof./s/3)
+end
+
+sarr(sdex)=1.5;
 
 if llines
 br = br./bphi.*rnorm;
@@ -256,12 +313,17 @@ lines_out.nr=numel(r);
 lines_out.nphi=numel(phi);
 lines_out.nz=numel(z);
 
+lines_out.maxamp=max(fluxir,[],'all');
 
 if lsave
 %end_state= h5read(filename_in,'/end_state');
 %end_state=2.*ones(size(end_state));
 %rbphi = h5read(filename_out,'/B_PHI');
 %if sum(size(rbphi)-size(bphi))~=0
+if isfile(filename_out)
+    delete(filename_out)
+    disp('Found old file. Overwriting!')
+end
 write_hdf5(filename_out,lines_out);
 % if isfile(filename_out)
 % delete_hdf5_group(filename_out,'/B_R');
@@ -312,7 +374,7 @@ end
 % H5L.delete(fid,group_name,'H5P_DEFAULT');
 % H5F.close(fid);
 % end
-function A_mn = islandWidthPerturbation(s, m, n, rho_mn, s_mn, alpha, beta, gamma)
+function A_mn = islandWidthPerturbation(s, m, rho_mn, s_mn, alpha, beta, gamma,lplot)
     % islandWidthPerturbation calculates the perturbation strength for a magnetic island.
     %
     % This function is vectorized to handle arrays of 's' values.
@@ -320,7 +382,6 @@ function A_mn = islandWidthPerturbation(s, m, n, rho_mn, s_mn, alpha, beta, gamm
     % Arguments:
     % s     : An array of normalized toroidal flux values of the q = m/n surface.
     % m     : Poloidal mode number.
-    % n     : Toroidal mode number.
     % rho_mn: Free parameter for perturbation strength in the vacuum region.
     % s_mn  : Normalized toroidal flux at the q = m/n surface.
     % alpha : Free parameter alpha.
@@ -338,13 +399,28 @@ function A_mn = islandWidthPerturbation(s, m, n, rho_mn, s_mn, alpha, beta, gamm
     index_s_greater = s > s_mn;
 
     % Calculate A_mn for s less than or equal to s_mn
-    A_mn(index_s_less_equal) = rho_mn * alpha .* ((s(index_s_less_equal) / s_mn).^(m/2)) ...
-                               .* (1 - beta * ((s(index_s_less_equal) / s_mn).^(1/2)));
+    A_mn(index_s_less_equal) = rho_mn * alpha .* (s(index_s_less_equal) / s_mn).^(m/2) ...
+        .* (1 - beta * ((s(index_s_less_equal) / s_mn).^(1/2)));
 
     % Calculate A_mn for s greater than s_mn
     A_mn(index_s_greater) = rho_mn * (alpha * (1 - beta) ...
-                               + gamma * (s(index_s_greater) / s_mn).^(1/2)) ...
-                               ./ ((s(index_s_greater) / s_mn).^((n+1)/2));
+        - gamma +gamma * (s(index_s_greater) / s_mn).^(1/2)) ...
+        ./ ((s(index_s_greater) / s_mn).^((m+1)/2));
+    if lplot
+        figure
+        x=linspace(0,1.5,100);
+        hold on
+        index_s_less_equal = x <= s_mn;
+        index_s_greater = x > s_mn;
+        y(index_s_less_equal)=rho_mn * alpha .* ((x(index_s_less_equal) / s_mn).^(m/2)) ...
+            .* (1 - beta * ((x(index_s_less_equal) / s_mn).^(1/2)));
+        y(index_s_greater) = rho_mn * (alpha * (1 - beta) ...
+            - gamma+ gamma * (x(index_s_greater) / s_mn).^(1/2)) ...
+            ./ ((x(index_s_greater) / s_mn).^((m+1)/2));
+        plot(x,y);
+        xlabel('S=\rho^2')
+        ylabel('Perturbation Amplitude');
+    end
 end
 
 
