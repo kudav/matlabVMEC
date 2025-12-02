@@ -460,7 +460,8 @@ if lplots
     set(gca,'Clipping','off');
     axis off;
 end
+if isempty(fid)
 fclose(fid);
-
+end
 end
 

@@ -20,8 +20,25 @@ zaxis=zeros(1,beam_data.nphi);
 % Make 2D
 for i=1:beam_data.nphi-1
     S2D = squeeze(beam_data.S_ARR(:,i,:));
-    smin = double(min(min(S2D)));
+    smin = double(min(min(abs(S2D))));
     [row,col] = find(S2D==smin);
+    if all(diff(unique(col))==1) && all(diff(unique(row))==1)
+        col=round(mean(col));
+        row=round(mean(row));
+    elseif numel(row)>1
+        [c,~]=contour(beam_data.raxis,beam_data.zaxis,S2D',[1 1]);
+        Z_min = [];
+        idx = 1;
+        N = size(c,2);
+        [rg,zg]=ndgrid(beam_data.raxis,beam_data.zaxis);
+        while idx < N
+            pts = c(:,idx+(1:c(2,idx)));
+            in_region = inpolygon(rg,zg,pts(1,:),pts(2,:));
+            tmp=min(S2D(in_region));
+            Z_min(end+1) = tmp(1);
+            idx = idx+c(2,idx)+1;
+        end
+    end
     raxis(i) = beam_data.raxis(row);
     zaxis(i) = beam_data.zaxis(col); 
 end
