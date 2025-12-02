@@ -101,6 +101,31 @@ switch filetype
                 efit_data.rho0=fscanf(fid,'%e',nx);
             end
         end
+        % COCOS Stuff (assume sigma_rphiZ=1 and we want COCOS11)
+        if efit_data.qpsi(1) > 0 && sum(efit_data.spp) > 0
+            cocos_BRZ_factor = -1.0;
+            COCOS_ID = 17;
+        elseif efit_data.qpsi(1) > 0 && sum(efit_data.spp) < 0
+            cocos_BRZ_factor = 1.0;
+            COCOS_ID = 11;
+        elseif efit_data.qpsi(1) < 0 && sum(efit_data.spp) > 0
+            cocos_BRZ_factor = -1.0;
+            COCOS_ID = 13;
+        else
+            cocos_BRZ_factor = 1.0;
+            COCOS_ID = 15;
+        end
+
+        if abs(efit_data.sf(1) / (efit_data.xaxis * efit_data.btor)) >= 6 %~2pi
+            cocos_BRZ_factor = cocos_BRZ_factor / (8.0 * atan(1.0));
+            COCOS_ID = COCOS_ID - 10;
+        end
+
+        cocos_BP_factor = sign(efit_data.btor) * sign(efit_data.sf(1));
+
+        efit_data.cocos_BRZ_factor = cocos_BRZ_factor;
+        efit_data.COCOS_ID = COCOS_ID;
+        efit_data.cocos_BP_factor = cocos_BP_factor;
         fclose(fid);
         efit_data.out=read_namelist(filename,'OUT1');
         efit_data.basis=read_namelist(filename,'BASIS');
