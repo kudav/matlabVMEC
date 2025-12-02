@@ -20,7 +20,7 @@ zaxis=zeros(1,beam_data.nphi);
 % Make 2D
 for i=1:beam_data.nphi-1
     S2D = squeeze(beam_data.S_ARR(:,i,:));
-    smin = double(min(min(S2D)));
+    smin = double(min(min(abs(S2D))));
     [row,col] = find(S2D==smin);
     if all(diff(unique(col))==1) && all(diff(unique(row))==1)
         col=round(mean(col));
@@ -34,7 +34,8 @@ for i=1:beam_data.nphi-1
         while idx < N
             pts = c(:,idx+(1:c(2,idx)));
             in_region = inpolygon(rg,zg,pts(1,:),pts(2,:));
-            Z_min(end+1) = min(S2D(in_region));
+            tmp=min(S2D(in_region));
+            Z_min(end+1) = tmp(1);
             idx = idx+c(2,idx)+1;
         end
     end
