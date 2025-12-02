@@ -231,7 +231,7 @@ end
 
 %Setup beams
 nbeams = size(energy,1);
-npower = length(pfrac);
+npower = size(pfrac,2);
 ntotal = nbeams*npower;
 
 % Handle asize
