@@ -48,7 +48,12 @@ for i=1:length(files)
     data.Itor_t(:,i) = temp(:,11);
     data.effCD(:,i) = temp(:,12);
 end
-
+    temp = importdata('nT_profiles',' ',2);
+    temp = temp.data;
+    data.profiles.reff = temp(:,1);
+    data.profiles.ne = temp(:,2);
+    data.profiles.te = temp(:,3);
+    data.profiles.Zeff = temp(:,4);
 return;
 end
 
