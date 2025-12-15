@@ -38,6 +38,12 @@ if contains(filename,'.nc')
     data.nphi=data.kp;
     data.curlabel=regexp(data.coil_group,'\s+(,)?','split');
     data=rmfield(data,'ir');
+    fields_to_remove = fieldnames(data);
+    for i = 1:length(fields_to_remove)
+        if startsWith(fields_to_remove{i}, 'ar_') || startsWith(fields_to_remove{i}, 'ap_') || startsWith(fields_to_remove{i}, 'az_')
+            data = rmfield(data, fields_to_remove{i});
+        end
+    end
     data=rmfield(data,'jz');
     data=rmfield(data,'coil_group');
     data=rmfield(data,'kp');

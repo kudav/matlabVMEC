@@ -1,254 +1,307 @@
-function plot_mgrid(data,extcur,varargin)
-%PLOT_MGRID(data,extcur,[plottype])  Plots the data from read_mgrid
-%   The PLOT_MGRID routine plots data read by READ_MGRID.  There are
-%   various plotting options.
-%   Options:
-%       'basic':    Plots the total field on an mgrid plane.
-%                   'cutplane' option controls which plane (default=1)
-%       'total':    Plots 3 components and vector plot for each slice in
-%                   the mgrid file.
-%       '3dgrid':   Shows the 3D grid Planes.
-%       'modB':     |B| for a given cutplane
+function h = plot_mgrid(data, extcur, varargin)
+% PLOT_MGRID(data, extcur, ...) Plot MGRID data with flexible options.
+% 
+% Compatible with the original usage:
+%   plot_mgrid(data, extcur)                  % basic (single cutplane)
+%   plot_mgrid(data, extcur, 'basic')
+%   plot_mgrid(data, extcur, 'total')
+%   plot_mgrid(data, extcur, '3dgrid')
+%   plot_mgrid(data, extcur, 'modB')
+%   plot_mgrid(data, extcur, 'cutplane', 3)   % cutplane index (1..nphi)
 %
-%   Usage:
-%       mgrid_data=read_mgrid('mgrid.test');
-%       extcur=[1.2e4 1.2e4 1.2e4 -3.5e3 1.1e6 -2.5e4];
-%       plot_mgrid(mgrid_data,extcur);          %Plot Total Field (phi=0)
+% New name-value options:
+%   'PlotType'      : 'basic' | 'total' | '3dgrid' | 'modB'  (default 'basic')
+%   'CutPlane'      : integer (phi index), default 1
+%   'Figure'        : figure handle to draw in, default new figure
+%   'Axes'          : axes handle to draw in (only used for single-axes plots)
+%   'Colormap'      : colormap name or matrix, default 'parula'
+%   'ColorLimits'   : [min max] for caxis, default auto per plot type
+%   'ShowQuiver'    : logical, overlay quiver for br/bz (default true in basic/total)
+%   'QuiverScale'   : numeric quiver scaling (default 1)
+%   'Pause'         : seconds between frames for 'total' (default 0.5)
+%   'GridResolution': integer resolution for 3d grid planes (default 20)
 %
-%   See also read_mgrid.
-%
-%   Created by: S. Lazerson (lazerson@pppl.gov)
-%   Version:    1.0
-%   Date:       10/19/10
+% Returns:
+%   h : struct of handles (figure, axes, plots), fields depend on plot type.
 
-% Handle extcur
-if ~(size(extcur,2) == data.nextcur)
-    disp(' - ERROR: Extcur size mismatch');
-    return
+% ---------------------------
+% Input preprocessing
+% ---------------------------
+% Tolerate original positional flags and cutplane
+[plotTypeFlag, cutplaneFlag, rest] = preprocessLegacyVarargin(varargin);
+
+% Parse name-value options
+p = inputParser;
+p.addParameter('PlotType', plotTypeFlag, @(s)ischar(s) || isstring(s));
+p.addParameter('CutPlane', cutplaneFlag, @(x)isscalar(x) && isnumeric(x) && x>=1);
+p.addParameter('Figure', [], @(h) isempty(h) || ishghandle(h,'figure'));
+p.addParameter('Axes', [], @(h) isempty(h) || ishghandle(h,'axes'));
+p.addParameter('Colormap', 'parula', @(c) (ischar(c) || isstring(c) || isnumeric(c)));
+p.addParameter('ColorLimits', [], @(x) isempty(x) || (isnumeric(x) && numel(x)==2));
+p.addParameter('ShowQuiver', true, @(b)islogical(b) || isnumeric(b));
+p.addParameter('QuiverScale', 1, @(x)isscalar(x) && isnumeric(x));
+p.addParameter('Pause', 0.5, @(x)isscalar(x) && isnumeric(x) && x>=0);
+p.addParameter('GridResolution', 20, @(x)isscalar(x) && isnumeric(x) && x>=2);
+p.parse(rest{:});
+opts = p.Results;
+
+% ---------------------------
+% Validate data and extcur
+% ---------------------------
+% Determine number of currents
+if isfield(data,'nextcur')
+    ncur = data.nextcur;
+else
+    % Infer from br size if possible
+    if isfield(data,'br') && ndims(data.br)==4
+        ncur = size(data.br,4);
+    else
+        error('Cannot determine number of external currents (nextcur).');
+    end
 end
-% Handle varargin
-plottype=0;
-cutplane=1;
-if nargin > 2
-    for i=1:nargin-2
-        switch varargin{i}
-            case 'basic'
-                plottype=0;
-            case 'total'
-                plottype=1;
-            case '3dgrid'
-                plottype=2;
-            case 'modB'
-                plottype=3;
-            case 'cutplane'
-                i=i+1;
-                cutplane=varargin{i};
+
+% Accept scalar extcur (replicate), or vector matching ncur
+if isempty(extcur)
+    error('extcur cannot be empty.');
+end
+if isscalar(extcur) && ncur>1
+    extcur = repmat(extcur, 1, ncur);
+elseif numel(extcur) ~= ncur
+    error('Extcur size mismatch: expected %d elements, got %d.', ncur, numel(extcur));
+end
+
+% Validate presence of required fields
+reqFields = {'br','bphi','bz','raxis','zaxis'};
+for k = 1:numel(reqFields)
+    if ~isfield(data, reqFields{k})
+        error('Data missing required field: %s', reqFields{k});
+    end
+end
+% Determine nphi and phi vector
+if isfield(data,'phi')
+    phi = data.phi(:).';
+else
+    % Fall back to uniform spacing if missing
+    nphi = size(data.br,3);
+    phi = linspace(0, 2*pi, nphi);
+end
+
+% Dimensions
+nr   = size(data.br,1);
+nz   = size(data.br,2);
+nphi = size(data.br,3);
+
+% Validate cutplane index
+cutIdx = max(1, min(nphi, round(opts.CutPlane)));
+
+% ---------------------------
+% Compute total fields efficiently
+% ---------------------------
+scale = reshape(extcur(:), [1 1 1 ncur]);  % broadcast along 4th dimension
+brt   = sum(data.br   .* scale, 4);
+bphit = sum(data.bphi .* scale, 4);
+bzt   = sum(data.bz   .* scale, 4);
+bmag  = sqrt(brt.^2 + bphit.^2 + bzt.^2);
+
+% Axes grids consistent with nr x nz layout
+[R, Z] = ndgrid(data.raxis(:), data.zaxis(:));  % size [nr x nz]
+
+% Color limits defaults
+autoClimComponents = [min([min(brt,[],'all'), min(bzt,[],'all'), min(bphit,[],'all')]), ...
+                      max([max(brt,[],'all'), max(bzt,[],'all'), max(bphit,[],'all')])];
+autoClimBmag = [min(bmag,[],'all'), max(bmag,[],'all')];
+
+% ---------------------------
+% Figure / axes setup
+% ---------------------------
+h = struct();
+if ~isempty(opts.Axes)
+    axParent = opts.Axes;
+    h.figure = ancestor(axParent,'figure');
+else
+    if isempty(opts.Figure) || ~ishghandle(opts.Figure,'figure')
+        h.figure = figure('Position',[100 100 1280 720]); % more reasonable default
+    else
+        h.figure = opts.Figure;
+    end
+    axParent = [];
+end
+colormap(h.figure, opts.Colormap);
+
+% ---------------------------
+% Plotting by type
+% ---------------------------
+plotType = lower(string(opts.PlotType));
+switch plotType
+    case "total"
+        % Pan through all phi cuts, updating plots
+        if isempty(axParent)
+            ax1 = subplot(2,2,1,'Parent',h.figure);
+            ax2 = subplot(2,2,2,'Parent',h.figure);
+            ax3 = subplot(2,2,3,'Parent',h.figure);
+            ax4 = subplot(2,2,4,'Parent',h.figure);
+        else
+            % If a single axes was provided, we will use it only for |B| plot
+            ax1 = axParent; ax2 = axParent; ax3 = axParent; ax4 = axParent;
+        end
+        clim = chooseClim(opts.ColorLimits, autoClimComponents);
+        for i = 1:nphi
+            % Toroidal field
+            axes(ax1);
+            hp1 = pcolor(R, Z, bphit(:,:,i)); set(hp1,'EdgeColor','none');
+            xlabel('R'); ylabel('Z'); title(sprintf('Toroidal B_\\phi, \\phi = %.1f°', rad2deg(phi(i))));
+            colorbar; caxis(clim); axis image;
+
+            % Radial field
+            axes(ax2);
+            hp2 = pcolor(R, Z, brt(:,:,i)); set(hp2,'EdgeColor','none');
+            xlabel('R'); ylabel('Z'); title(sprintf('Radial B_r, \\phi = %.1f°', rad2deg(phi(i))));
+            colorbar; caxis(clim); axis image;
+
+            % Vertical field
+            axes(ax3);
+            hp3 = pcolor(R, Z, bzt(:,:,i)); set(hp3,'EdgeColor','none');
+            xlabel('R'); ylabel('Z'); title(sprintf('Vertical B_z, \\phi = %.1f°', rad2deg(phi(i))));
+            colorbar; caxis(clim); axis image;
+
+            % Combined with quiver
+            axes(ax4);
+            hp4 = pcolor(R, Z, bphit(:,:,i)); set(hp4,'EdgeColor','none'); hold on;
+            if opts.ShowQuiver
+                quiver(R, Z, opts.QuiverScale*brt(:,:,i), opts.QuiverScale*bzt(:,:,i), 'k');
+            end
+            hold off; colorbar; caxis(clim);
+            xlabel('R'); ylabel('Z'); title(sprintf('B-field components, \\phi = %.1f°', rad2deg(phi(i))));
+            axis image;
+
+            pause(opts.Pause);
+        end
+        h.axes = [ax1, ax2, ax3, ax4];
+
+    case "basic"
+        % Single cutplane (default)
+        if isempty(axParent)
+            ax1 = subplot(2,2,1,'Parent',h.figure);
+            ax2 = subplot(2,2,2,'Parent',h.figure);
+            ax3 = subplot(2,2,3,'Parent',h.figure);
+            ax4 = subplot(2,2,4,'Parent',h.figure);
+        else
+            % Respect provided axes by drawing only the combined plot
+            ax1 = axParent; ax2 = axParent; ax3 = axParent; ax4 = axParent;
+        end
+        clim = chooseClim(opts.ColorLimits, autoClimComponents);
+
+        axes(ax1);
+        hp1 = pcolor(R, Z, bphit(:,:,cutIdx)); set(hp1,'EdgeColor','none');
+        xlabel('R'); ylabel('Z'); title('Toroidal B_\phi'); colorbar; caxis(clim); axis image;
+
+        axes(ax2);
+        hp2 = pcolor(R, Z, brt(:,:,cutIdx)); set(hp2,'EdgeColor','none');
+        xlabel('R'); ylabel('Z'); title('Radial B_r'); colorbar; caxis(clim); axis image;
+
+        axes(ax3);
+        hp3 = pcolor(R, Z, bzt(:,:,cutIdx)); set(hp3,'EdgeColor','none');
+        xlabel('R'); ylabel('Z'); title('Vertical B_z'); colorbar; caxis(clim); axis image;
+
+        axes(ax4);
+        hp4 = pcolor(R, Z, bphit(:,:,cutIdx)); set(hp4,'EdgeColor','none'); hold on;
+        if opts.ShowQuiver
+            quiver(R, Z, opts.QuiverScale*brt(:,:,cutIdx), opts.QuiverScale*bzt(:,:,cutIdx), 'k');
+        end
+        hold off; colorbar; caxis(clim);
+        xlabel('R'); ylabel('Z'); title(sprintf('B components at \\phi = %.1f°', rad2deg(phi(cutIdx))));
+        axis image;
+
+        h.axes = [ax1, ax2, ax3, ax4];
+
+    case "modb"
+        % Plot |B| at selected cutplane
+        ax = axParent;
+        if isempty(ax)
+            ax = axes('Parent', h.figure);
+        end
+        clim = chooseClim(opts.ColorLimits, autoClimBmag);
+        hp = pcolor(R, Z, bmag(:,:,cutIdx)); set(hp,'EdgeColor','none');
+        xlabel('R'); ylabel('Z'); title('|B|'); colorbar; caxis(clim); axis image;
+        h.axes = ax; h.plots.modB = hp;
+
+    case "3dgrid"
+        % Visualize cutplanes as surfaces in 3D
+        ax = axParent;
+        if isempty(ax)
+            ax = axes('Parent', h.figure);
+        end
+        hold(ax,'on');
+        % Build a coarse grid for visualization
+        rmin = pickField(data,'rmin', min(data.raxis));
+        rmax = pickField(data,'rmax', max(data.raxis));
+        zmin = pickField(data,'zmin', min(data.zaxis));
+        zmax = pickField(data,'zmax', max(data.zaxis));
+        rtemp = linspace(rmin, rmax, opts.GridResolution);
+        ztemp = linspace(zmin, zmax, opts.GridResolution);
+        [Rcoarse, Zcoarse] = ndgrid(rtemp, ztemp);
+        for j = 1:nphi
+            X = Rcoarse .* cos(phi(j));
+            Y = Rcoarse .* sin(phi(j));
+            Zgrid = Zcoarse;
+            s = surf(ax, X, Y, Zgrid, 'FaceColor', 'none', 'EdgeColor', [0.5 0.5 0.5]);
+        end
+        hold(ax,'off');
+        xlabel(ax,'X'); ylabel(ax,'Y'); zlabel(ax,'Z');
+        axis(ax,'equal'); xlim(ax,[0 rmax]); ylim(ax,[-rmax rmax]); zlim(ax,[zmin zmax]);
+        view(ax,3);
+        h.axes = ax;
+
+    otherwise
+        error('Unknown PlotType: %s', opts.PlotType);
+end
+
+end
+
+% ---------------------------
+% Helper functions
+% ---------------------------
+function [plotType, cutplane, rest] = preprocessLegacyVarargin(args)
+% Accept legacy positional flags: 'basic'|'total'|'3dgrid'|'modB' and 'cutplane', val
+plotType = 'basic';
+cutplane = 1;
+rest = args;
+if isempty(args), return; end
+% Find plot type flag
+flags = {'basic','total','3dgrid','modB'};
+for k = 1:numel(args)
+    if ischar(args{k}) || isstring(args{k})
+        s = lower(string(args{k}));
+        if any(strcmpi(s, flags))
+            plotType = char(s);
+            rest(k) = []; % remove flag
+            break;
         end
     end
 end
-% Setup Plotting Window
-fig=figure('Position',[1 1 1920 1080]);
-% Multiply B-fields by extcur
-bx=0.*data.bx;
-by=0.*bx;
-bz=0.*bx;
-bphi=0.*bx;
-br=0.*bx;
-for i=1:data.nextcur
-    bx(:,:,:,i)=data.bx(:,:,:,i).*extcur(i);
-    by(:,:,:,i)=data.by(:,:,:,i).*extcur(i);
-    bz(:,:,:,i)=data.bz(:,:,:,i).*extcur(i);
-    bphi(:,:,:,i)=data.bphi(:,:,:,i)*extcur(i);
-    br(:,:,:,i)=data.br(:,:,:,i).*extcur(i);
+% Find 'cutplane' followed by a value
+idx = [];
+for k = 1:numel(rest)
+    if ischar(rest{k}) || isstring(rest{k})
+        if strcmpi(string(rest{k}), 'cutplane') && (k < numel(rest))
+            val = rest{k+1};
+            if isnumeric(val) && isscalar(val)
+                cutplane = val;
+                idx = [k k+1];
+            end
+            break;
+        end
+    end
 end
-% Handle Creating total B-field
-switch plottype
-    case {0,1,3}
-        bxt=zeros(data.nr,data.nz,data.nphi);
-        byt=zeros(data.nr,data.nz,data.nphi);
-        bzt=zeros(data.nr,data.nz,data.nphi);
-        brt=zeros(data.nr,data.nz,data.nphi);
-        bphit=zeros(data.nr,data.nz,data.nphi);
-        for i=1:data.nextcur
-            bxt=bxt+bx(:,:,:,i);
-            byt=byt+by(:,:,:,i);
-            bzt=bzt+bz(:,:,:,i);
-            brt=brt+br(:,:,:,i);
-            bphit=bphit+bphi(:,:,:,i);
-        end
-        bminr=min(min(min(brt)));
-        bminz=min(min(min(bzt)));
-        bminp=min(min(min(bphit)));
-        bmin=min([bminr bminp bminz]);
-        bmaxr=max(max(max(brt)));
-        bmaxz=max(max(max(bzt)));
-        bmaxp=max(max(max(bphit)));
-        bmax=max([bmaxr bmaxz bmaxp]);
-end
-% Now Handles plots
-switch plottype
-    case 1 % Pan through cuts
-        startx=3.2:.1:4.6;
-        starty=0.*startx;
-        haxes=subplot(2,2,1);
-        raxis2d=repmat(data.raxis',[1 data.nz]);
-        zaxis2d=repmat(data.zaxis,[data.nr 1]);
-        bmag=sqrt(brt.*brt+bphit.*bphit+bzt.*bzt);
-        for i=1:data.nphi
-            % First plot Toroidal B-Field
-            subplot(2,2,1);
-            hplot1=pcolor(raxis2d,zaxis2d,bphit(:,:,i));
-            set(hplot1,'EdgeColor','none');
-            xlabel('R-Axis');
-            ylabel('Z-Axis');
-            title('Toroidal Field');
-            colorbar
-            caxis([bmin bmax]);
-            axis image
-            % Second plot Radial Field
-            subplot(2,2,2);
-            hplot2=pcolor(raxis2d,zaxis2d,brt(:,:,i));
-            set(hplot2,'EdgeColor','none');
-            xlabel('R-Axis');
-            ylabel('Z-Axis');
-            title('Radial Field');
-            colorbar
-            caxis([bmin bmax]);
-            axis image
-            % Third plot vertical Field
-            subplot(2,2,3);
-            hplot3=pcolor(raxis2d,zaxis2d,bzt(:,:,i));
-            set(hplot3,'EdgeColor','none');
-            xlabel('R-Axis');
-            ylabel('Z-Axis');
-            title('Vertical Field');    
-            colorbar
-            caxis([bmin bmax]);
-            axis image
-            % Now plot combine field
-            subplot(2,2,4);
-            hplot4=pcolor(raxis2d,zaxis2d,bphit(:,:,i));
-            set(hplot4,'EdgeColor','none');
-            hold on
-            quiver(raxis2d,zaxis2d,brt(:,:,i),bzt(:,:,i),'Color','black');
-            hold off
-            colorbar
-            xlabel('R-Axis');
-            ylabel('Z-Axis');
-            title('MGRID B-Field at \phi=0');
-            caxis([bmin bmax]);
-            axis image
-            pause(1.0);
-        end
-    case 2 % Plot 3D grid cutplanes
-        % Because the actual grids are very fine we abstract to a
-        % 20x20 grid for visualization
-        rtemp=data.rmin:(data.rmax-data.rmin)/19:data.rmax;
-        ztemp=data.zmin:(data.zmax-data.zmin)/19:data.zmax;
-        % First we need to 2d arrays for r and z
-        raxis2d=repmat(rtemp',[1 20]);
-        zaxis2d=repmat(ztemp,[20 1]);
-        % Next we need to map to X(nr,nphi,nz) and Y(nr,nphi,nz)
-        % Z is the same on each cut plane
-        x2d=zeros(20,data.nphi,20);
-        y2d=zeros(20,data.nphi,20);
-        for i=1:20
-            for j=1:data.nphi
-                x2d(i,j,:)=raxis2d(i,:).*cos(data.phi(j));
-                y2d(i,j,:)=raxis2d(i,:).*sin(data.phi(j));
-            end
-        end
-        % Now for each surface we create a create the patch object
-        % The verex list will run over nr
-        for i=1:data.nphi
-            vertex=[0 0 0];
-            for j=1:20
-                for k=1:20
-                    vertex=[vertex; x2d(k,i,j) y2d(k,i,j) zaxis2d(k,j)];
-                end
-            end
-            vertex=vertex(2:size(vertex,1),:);
-            faces=[1 2 2+20 1+20];
-            for j=1:19
-                for k=1:19
-                    index=j+20*(k-1);
-                    faces=[faces; index index+1 index+1+20 index+20];
-                end
-            end
-            faces=faces(2:size(faces,1),:);
-            hold on
-            patch('Vertices',vertex,'Faces',faces,'FaceColor','none')
-            hold off
-        end
-        xlim([0 data.rmax]);
-        ylim([0 data.rmax]);
-        zlim([data.zmin data.zmax]);
-        axis square
-        view(3)
-    case 3 % Plot |B|
-        raxis2d=repmat(data.raxis',[1 data.nz]);
-        zaxis2d=repmat(data.zaxis,[data.nr 1]);
-        bmag=sqrt(brt.*brt+bphit.*bphit+bzt.*bzt);
-        bmin=min(min(min(bmag)));
-        bmax=max(max(max(bmag)));
-        hplot1=pcolor(raxis2d,zaxis2d,bmag(:,:,cutplane));
-        set(hplot1,'EdgeColor','none');
-        xlabel('R-Axis');
-        ylabel('Z-Axis');
-        title('|B| Field');
-        colorbar
-        %caxis([bmin bmax]);
-        axis image
-        
-    case 0 %Total Plot on phi=0 plane only
-        haxes=subplot(2,2,1);
-        raxis2d=repmat(data.raxis',[1 data.nz]);
-        zaxis2d=repmat(data.zaxis,[data.nr 1]);
-        bmag=sqrt(brt.*brt+bphit.*bphit+bzt.*bzt);
-        % First plot Toroidal B-Field
-        subplot(2,2,1);
-        hplot1=pcolor(raxis2d,zaxis2d,bphit(:,:,cutplane));
-        set(hplot1,'EdgeColor','none');
-        xlabel('R-Axis');
-        ylabel('Z-Axis');
-        title('Toroidal Field');
-        colorbar
-        caxis([bmin bmax]);
-        axis image
-        % Second plot Radial Field
-        subplot(2,2,2);
-        hplot2=pcolor(raxis2d,zaxis2d,brt(:,:,cutplane));
-        set(hplot2,'EdgeColor','none');
-        xlabel('R-Axis');
-        ylabel('Z-Axis');
-        title('Radial Field');
-        colorbar
-        caxis([bmin bmax]);
-        axis image
-        % Third plot vertical Field
-        subplot(2,2,3);
-        hplot3=pcolor(raxis2d,zaxis2d,bzt(:,:,cutplane));
-        set(hplot3,'EdgeColor','none');
-        xlabel('R-Axis');
-        ylabel('Z-Axis');
-        title('Vertical Field');
-        colorbar
-        caxis([bmin bmax]);
-        axis image
-        % Now plot combine field
-        subplot(2,2,4);
-        hplot4=pcolor(raxis2d,zaxis2d,bphit(:,:,cutplane));
-        set(hplot4,'EdgeColor','none');
-        hold on
-        quiver(raxis2d,zaxis2d,brt(:,:,cutplane),bzt(:,:,cutplane),'Color','black');
-        hold off
-        colorbar
-        caxis([bmin bmax]);
-        xlabel('R-Axis');
-        ylabel('Z-Axis');
-        title('MGRID B-Field at \phi=0');
-        %caxis([bmin bmax]);
-        axis image
+if ~isempty(idx)
+    rest(idx) = []; % remove cutplane pair
 end
 end
 
+function clim = chooseClim(userClim, autoClim)
+if isempty(userClim), clim = autoClim; else, clim = userClim; end
+end
+
+function val = pickField(s, name, default)
+if isfield(s, name), val = s.(name); else, val = default; end
+end
