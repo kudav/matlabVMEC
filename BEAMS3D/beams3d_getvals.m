@@ -18,7 +18,7 @@ values = struct();
 % List of valid field names
 valid_field_names = {'TE', 'NE', 'TI',...
     'S_ARR', 'U_ARR','POT_ARR', 'ZEFF_ARR',...
-    'B_R', 'B_PHI','B_Z'};
+    'B_R', 'B_PHI','B_Z','MODB'};
 
 % Iterate over each requested field name in varargin
 for i = 1:length(varargin)
@@ -26,7 +26,11 @@ for i = 1:length(varargin)
     % Check if the field name is valid
     if ismember(field_name, valid_field_names)
         if ~isfield(data,field_name)%Load field if not available
-            data.(field_name)= h5read(b3d_filename,['/',field_name]);
+            if strcmp(field_name,'MODB')
+                data.(field_name)=sqrt(data.B_R.^2+data.B_PHI.^2+data.B_Z.^2);
+            else
+                data.(field_name)= h5read(b3d_filename,['/',field_name]);
+            end
         end
         % Interpolate the field
         %field_data = getfield(data, field_name);  % Access field data
