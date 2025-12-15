@@ -150,7 +150,7 @@ numdefargs=3;
 handles.output = hObject;
 % Get the filelist
 filelist=dir('wout*');
-filelist=filelist(1:size(filelist));
+filelist=filelist(1:numel(filelist));
 % Set some initial stuff
 handles.cuttype='text';
 handles.rval=1;
