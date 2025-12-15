@@ -37,6 +37,7 @@ te_s=[]; te_f=[];
 ti_s=[]; ti_f=[];
 zeff_s=[]; zeff_f=[];
 pot_s=[]; pot_f=[];
+Omeg_s=[];Omeg_f=[];
 rhofo = [];
 nr=128; nz=128; nphi=[];
 nrho_dist=64; ntheta_dist = 8; nzeta_dist=40; nvpara_dist = 32; nvperp_dist=16; partvmax=1.25E7;
@@ -119,6 +120,11 @@ if (nargin > 6)
                     temp=varargin{j};
                     zeff_s=temp(1,:);
                     zeff_f=temp(2,:);
+                case {'Omeg'}
+                    j=j+1;
+                    temp=varargin{j};
+                    Omeg_s=temp(1,:);
+                    Omeg_f=temp(2,:);
                 case {'POT'}
                     j=j+1;
                     temp=varargin{j};
@@ -208,7 +214,8 @@ if isempty(charge)
     charge = Zatom.*ec;
 end
 % Handle Power fractions
-if isempty(pfrac)
+if isempty(pfrac)    
+disp('Using standard beam power fractions! Supply pfrac to control this (1,nfrac) or (nbeams, nfrac).')    
     switch species_type
         case {'H','D','T'}
             pfrac=[0.5 0.4 0.1];
@@ -223,8 +230,8 @@ if (max(energy) > 1)
 end
 
 %Setup beams
-nbeams = length(energy);
-npower = length(pfrac);
+nbeams = size(energy,1);
+npower = size(pfrac,2);
 ntotal = nbeams*npower;
 
 % Handle asize
@@ -252,7 +259,7 @@ end
 if nzeta_dist < vmec_data.nfp*4
     nzeta_dist = vmec_data.nfp*4;
 end
-partvmax = (6./5).*max(sqrt(2.*energy./mass));
+%partvmax = (6./5).*max(sqrt(2.*energy./mass));
 
 % Handle no profiles passed
 if isempty(ne_f)
@@ -284,7 +291,7 @@ fprintf(fid,['  ZMAX = ' num2str(zmax,'%20.10E') '\n']);
 fprintf(fid, '  PHIMIN = 0.0\n');
 fprintf(fid,['  PHIMAX = ' num2str(2.*pi./vmec_data.nfp,'%20.10E') '\n']);
 fprintf(fid, '  INT_TYPE = ''LSODE''\n');
-fprintf(fid, '  FOLLOW_TOL = 1.0E-9\n');
+fprintf(fid, '  FOLLOW_TOL = 1.0E-10\n');
 fprintf(fid,['  VC_ADAPT_TOL = ' num2str(vc_adapt_tol,'%20.10E') '\n']);
 fprintf(fid,['  NPOINC = ' num2str(npoinc,'%d') '\n']);
 if ~isempty(rhofo), fprintf(fid,['  RHO_FULLORBIT = ' num2str(rhofo,'%20.10E') '\n']); end
@@ -292,6 +299,10 @@ fprintf(fid, '!--------PROFILES ----\n');
 if ~isempty(pot_f)
     fprintf(fid,[ '  POT_AUX_S = ' num2str(pot_s,'%12.6E  ') '\n']);
     fprintf(fid,[ '  POT_AUX_F = ' num2str(pot_f,'%12.6E  ') '\n']);
+end
+if ~isempty(Omeg_f)
+    fprintf(fid,[ '  Omeg_AUX_S = ' num2str(Omeg_s,'%12.6E  ') '\n']);
+    fprintf(fid,[ '  Omeg_AUX_F = ' num2str(Omeg_f,'%12.6E  ') '\n']);
 end
 fprintf(fid,[ '  NE_AUX_S = ' num2str(ne_s,'%12.6E  ') '\n']);
 fprintf(fid,[ '  NE_AUX_F = ' num2str(ne_f,'%12.6E  ') '\n']);
@@ -346,19 +357,26 @@ for i=1:nbeams
             fprintf(fid,['!-- ' note{i} '  Energy=' num2str(energy(i).*(1.0/j)./(ec.*1E3),'%5.2f') '\n']);
         end
         fprintf(fid,['  E_BEAMS(' num2str(n,'%2.2d') ') = ' num2str(energy(i).*(1.0/j),'%20.10E') '\n']);
+        if ndims(pfrac)==1
         fprintf(fid,['  P_BEAMS(' num2str(n,'%2.2d') ') = ' num2str(power(i).*pfrac(j),'%20.10E') '\n']);
+        else
+            fprintf(fid,['  P_BEAMS(' num2str(n,'%2.2d') ') = ' num2str(power(i).*pfrac(i,j),'%20.10E') '\n']);
+        end
         fprintf(fid,['  DIV_BEAMS(' num2str(n,'%2.2d') ') = ' num2str(div_beam(i),'%20.10E') '\n']);
+        if ~isempty(beam_dex)
+            fprintf(fid,['  DEX_BEAMS(' num2str(n,'%2.2d') ') = ' num2str(beam_dex(i),'%2i') '\n']);
+        else
         fprintf(fid,['  ADIST_BEAMS(' num2str(n,'%2.2d') ') = ' num2str(adist(i),'%20.10E') '\n']);
         fprintf(fid,['  ASIZE_BEAMS(' num2str(n,'%2.2d') ') = ' num2str(asize(i),'%20.10E') '\n']);
         fprintf(fid,['  R_BEAMS(' num2str(n,'%2.2d') ',1:2) = ' num2str(r_beam(1:2,i)','%20.10E') '\n']);
         fprintf(fid,['  PHI_BEAMS(' num2str(n,'%2.2d') ',1:2) = ' num2str(phi_beam(1:2,i)',' %20.10E') '\n']);
         fprintf(fid,['  Z_BEAMS(' num2str(n,'%2.2d') ',1:2) = ' num2str(z_beam(1:2,i)',' %20.10E') '\n']);
-        if ~isempty(beam_dex)
-            fprintf(fid,['  DEX_BEAMS(' num2str(n,'%2.2d') ') = ' num2str(beam_dex(i),'%2i') '\n']);
         end
         n=n+1;
     end
 end
+fprintf(fid,'  R_START_IN = -1.0 ! To prevent lbeam from being set to false\n');
+
 fprintf(fid,'/\n');
 
 if lplots
