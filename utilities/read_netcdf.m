@@ -157,7 +157,7 @@ if ndimen >0
         if length(dimname) > maxlength
             disp(['Warning Dimension Name: ' dimname ' too long.  Max structure name length:' num2str(maxlength)]');
         end
-        attname(dimname=='.')='_';
+        dimname(dimname=='.')='_';
         dimname(dimname=='-')='n';
         dimname(dimname=='+')='p';
         if strip, dimname(~isstrprop(dimname,'alphanum'))=''; end;
@@ -177,7 +177,7 @@ if nvars >0
         if length(varname) > maxlength
             disp(['Warning Variable Name: ' varname ' too long.  Max structure name length:' num2str(maxlength)]');
         end
-        attname(varname=='.')='_';
+        varname(varname=='.')='_';
         varname(varname=='-')='n';
         varname(varname=='+')='p';
         if strip, varname(~isstrprop(varname,'alphanum'))=''; end;
@@ -223,18 +223,13 @@ if nvars >0
                     fprintf(fid,'\t %s: ',varattname);
                 end                
                 switch char(att.getDataType)
-                    case 'int'
-                        data.(varattname)=att.getNumericValue.intValue;
-                    case 'float'
-                        data.(varattname)=att.getNumericValue.floatValue;
-                    case 'double'
-                        data.(varattname)=att.getNumericValue.doubleValue;
-                    case 'short'
-                        data.(varattname)=att.getNumericValue.shortValue;
-                    case 'long'
-                        data.(varattname)=att.getNumericValue.longValue;
-                    case 'byte'
-                        data.(varattname)=att.getNumericValue.byteValue;
+                    case {'int','float','double','short','long','byte'}
+                        if ~isempty(att.getNumericValue)
+                        tmp=[char(att.getDataType),'Value'];
+                        data.(varattname)=att.getNumericValue.(tmp);
+                        else
+                            data.(varattname)=[];
+                        end
                     case 'String'
                         data.(varattname)=char(att.getStringValue);
                         if write
