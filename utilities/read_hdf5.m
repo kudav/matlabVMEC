@@ -8,7 +8,7 @@ function data = read_hdf5(filename)
 %   Example
 %       data=read_hdf5('input.h5');
 %
-%   Version 1.3
+%   Version 1.4
 %   Maintained by: Samuel Lazerson (lazerson@pppl.gov)
 %   Date  05/02/2012
 
@@ -25,15 +25,26 @@ catch h5info_error
     return
 end
 
-% h5info('/') already returns the entire tree recursively.
-% Walk that cached tree once instead of re-calling h5info per subgroup,
-% which on deeply nested files caused effectively-exponential re-scans.
-data = walkGroup(filename, data_info);
+% h5info('/') already returns the entire tree recursively, so we walk that
+% cached struct rather than re-calling h5info per subgroup. We also keep a
+% visited-set keyed on the canonical object address (via H5O.get_info), so
+% that hard links / soft links / cycles do not cause the same group to be
+% read repeatedly.
+fid     = H5F.open(filename, 'H5F_ACC_RDONLY', 'H5P_DEFAULT');
+visited = containers.Map('KeyType','char','ValueType','logical');
+cleanupObj = onCleanup(@() H5F.close(fid));
+
+data = walkGroup(filename, fid, data_info, visited);
 return
 end
 
-function data = walkGroup(filename, info)
+function data = walkGroup(filename, fid, info, visited)
 data = struct();
+
+key = objKey(fid, info.Name);
+if ~isempty(key)
+    visited(key) = true;
+end
 
 for i = 1:length(info.Datasets)
     name_local = strrep(info.Datasets(i).Name,' ','_');
@@ -51,16 +62,37 @@ for i = 1:length(info.Datasets)
 end
 
 for i = 1:length(info.Groups)
-    group_name = info.Groups(i).Name;
-    dex = strfind(group_name,'/');
-    group_name = group_name(dex(end)+1:end);
+    gpath  = info.Groups(i).Name;
+    subkey = objKey(fid, gpath);
+    if ~isempty(subkey) && isKey(visited, subkey)
+        continue   % alias / cycle — already read
+    end
+    group_name = gpath(find(gpath=='/',1,'last')+1:end);
     group_name = strrep(group_name,':','_');
     try
-        data.(group_name) = walkGroup(filename, info.Groups(i));
+        data.(group_name) = walkGroup(filename, fid, info.Groups(i), visited);
     catch
         group_name = ['GID_' group_name];
-        data.(group_name) = walkGroup(filename, info.Groups(i));
+        data.(group_name) = walkGroup(filename, fid, info.Groups(i), visited);
     end
+end
+return
+end
+
+function key = objKey(fid, path)
+% Return a string identifying the underlying HDF5 object so that aliases
+% (multiple hard links to one group) collapse to the same key.
+key = '';
+try
+    oinfo = H5O.get_info_by_name(fid, path, 'H5P_DEFAULT');
+    if isstruct(oinfo) && isfield(oinfo,'addr')
+        key = sprintf('%lu', uint64(oinfo.addr));
+    elseif isstruct(oinfo) && isfield(oinfo,'token')
+        key = sprintf('%d_', oinfo.token(:));
+    end
+catch
+    % Fall back to path-based dedup if H5O is unavailable
+    key = path;
 end
 return
 end
