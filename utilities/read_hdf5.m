@@ -8,7 +8,7 @@ function data = read_hdf5(filename)
 %   Example
 %       data=read_hdf5('input.h5');
 %
-%   Version 1.2
+%   Version 1.3
 %   Maintained by: Samuel Lazerson (lazerson@pppl.gov)
 %   Date  05/02/2012
 
@@ -25,68 +25,41 @@ catch h5info_error
     return
 end
 
-ngroups = length(data_info.Groups);
-nvars = length(data_info.Datasets);
-% Get root datasets
-for i = 1: nvars
-    name_local=data_info.Datasets(i).Name;
-    name_local=strrep(name_local,' ','_');
-    data.(name_local) = h5read(filename,['/' data_info.Datasets(i).Name]);
-    natts = length(data_info.Datasets(i).Attributes);
-    for j=1:natts
-        att_name_local=data_info.Datasets(i).Attributes(j).Name;
-        if ~contains(att_name_local,name_local)
-            att_name_local=[name_local '_att_' strrep(att_name_local,' ','_')];
-        end
-        %data.(att_name_local) = data_info.Datasets(i).Attributes(j).Value{1};
-        data.(att_name_local) = data_info.Datasets(i).Attributes(j).Value;
-    end
-end
-
-% Get each subgroup
-if ngroups > 0
-    for i = 1 : ngroups
-        group_name = data_info.Groups(i).Name;
-        group_name=strrep(group_name,':','_');
-        data.(group_name(2:end)) = getGroup(filename,[data_info.Groups(i).Name]);
-    end
-end
+% h5info('/') already returns the entire tree recursively.
+% Walk that cached tree once instead of re-calling h5info per subgroup,
+% which on deeply nested files caused effectively-exponential re-scans.
+data = walkGroup(filename, data_info);
 return
 end
 
-function data = getGroup(filename,rootdir)
-data_info = h5info(filename,rootdir);
-ngroups = length(data_info.Groups);
-nvars = length(data_info.Datasets);
-% Get root datasets
-for i = 1: nvars
-    
-    name_local=data_info.Datasets(i).Name;
-    name_local=strrep(name_local,' ','_');
-     data.([data_info.Datasets(i).Name]) = h5read(filename,[rootdir '/' data_info.Datasets(i).Name]);
-    natts = length(data_info.Datasets(i).Attributes);
-    for j=1:natts
-        att_name_local=data_info.Datasets(i).Attributes(j).Name;
-        if ~startsWith(att_name_local,name_local)
-            att_name_local=[name_local '_att_' strrep(att_name_local,' ','_')];
+function data = walkGroup(filename, info)
+data = struct();
+
+for i = 1:length(info.Datasets)
+    name_local = strrep(info.Datasets(i).Name,' ','_');
+    fullpath   = [info.Name '/' info.Datasets(i).Name];
+    fullpath   = strrep(fullpath,'//','/');
+    data.(name_local) = h5read(filename, fullpath);
+    natts = length(info.Datasets(i).Attributes);
+    for j = 1:natts
+        att_name_local = info.Datasets(i).Attributes(j).Name;
+        if ~contains(att_name_local,name_local)
+            att_name_local = [name_local '_att_' strrep(att_name_local,' ','_')];
         end
-        %data.(att_name_local) = data_info.Datasets(i).Attributes(j).Value{1};
-        data.(att_name_local) = data_info.Datasets(i).Attributes(j).Value;
-    end    
+        data.(att_name_local) = info.Datasets(i).Attributes(j).Value;
+    end
 end
 
-% Get each subgroup
-if ngroups > 0
-    for i = 1 : ngroups
-        group_name = data_info.Groups(i).Name;
-        dex = strfind(group_name,'/');
-        group_name = [group_name(dex(end)+1:end)];
-        try
-            data.(group_name) = getGroup(filename,['/' data_info.Groups(i).Name]);
-        catch
-            group_name=['GID_' group_name];
-            data.(group_name) = getGroup(filename,['/' data_info.Groups(i).Name]);
-        end
+for i = 1:length(info.Groups)
+    group_name = info.Groups(i).Name;
+    dex = strfind(group_name,'/');
+    group_name = group_name(dex(end)+1:end);
+    group_name = strrep(group_name,':','_');
+    try
+        data.(group_name) = walkGroup(filename, info.Groups(i));
+    catch
+        group_name = ['GID_' group_name];
+        data.(group_name) = walkGroup(filename, info.Groups(i));
     end
 end
 return
